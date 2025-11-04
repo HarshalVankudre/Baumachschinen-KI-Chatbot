@@ -77,8 +77,8 @@ docker-compose*.yml
 # Development files
 .eslintrc*
 .prettierrc*
-tsconfig*.json
-vite.config.*
+# tsconfig*.json - NEEDED for build
+# vite.config.* - NEEDED for build
 jest.config.*
 playwright.config.*
 
