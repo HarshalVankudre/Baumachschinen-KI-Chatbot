@@ -1,0 +1,239 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>E-Mail-Adresse bestätigen</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #1f2937;
+            background-color: #f3f4f6;
+            padding: 0;
+            margin: 0;
+        }
+
+        .email-wrapper {
+            width: 100%;
+            background-color: #f3f4f6;
+            padding: 20px 0;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 0 0 8px 0;
+            letter-spacing: -0.5px;
+        }
+
+        .header .subtitle {
+            font-size: 16px;
+            opacity: 0.95;
+            font-weight: 400;
+        }
+
+        .content {
+            padding: 45px 40px;
+            background-color: #ffffff;
+        }
+
+        .content h2 {
+            color: #1f2937;
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0 0 25px 0;
+        }
+
+        .content p {
+            color: #4b5563;
+            font-size: 16px;
+            line-height: 1.7;
+            margin: 0 0 20px 0;
+        }
+
+        .greeting {
+            color: #1f2937;
+            font-weight: 600;
+            font-size: 17px;
+        }
+
+        .button-container {
+            text-align: center;
+            margin: 35px 0;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 16px 40px;
+            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+            color: white !important;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+        }
+
+        .link-box {
+            background-color: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+            word-break: break-all;
+            font-size: 14px;
+            color: #6b7280;
+        }
+
+        .info-box {
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 16px 20px;
+            margin: 25px 0;
+            border-radius: 4px;
+        }
+
+        .info-box p {
+            margin: 0;
+            color: #92400e;
+            font-size: 15px;
+        }
+
+        .security-notice {
+            background-color: #f0f9ff;
+            border-left: 4px solid #2563eb;
+            padding: 16px 20px;
+            margin: 25px 0;
+            border-radius: 4px;
+        }
+
+        .security-notice p {
+            margin: 0;
+            color: #1e40af;
+            font-size: 15px;
+        }
+
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px 40px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .footer p {
+            color: #6b7280;
+            font-size: 14px;
+            margin: 8px 0;
+        }
+
+        .footer .brand {
+            font-weight: 600;
+            color: #2563eb;
+            font-size: 15px;
+        }
+
+        .footer .company {
+            color: #4b5563;
+            font-weight: 500;
+        }
+
+        @media only screen and (max-width: 600px) {
+            .email-container {
+                border-radius: 0;
+                margin: 0;
+            }
+
+            .header {
+                padding: 30px 20px;
+            }
+
+            .header h1 {
+                font-size: 24px;
+            }
+
+            .content {
+                padding: 30px 20px;
+            }
+
+            .content h2 {
+                font-size: 20px;
+            }
+
+            .button {
+                padding: 14px 30px;
+                font-size: 15px;
+            }
+
+            .footer {
+                padding: 25px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="header">
+                <h1>Baumaschinen-KI</h1>
+                <div class="subtitle">Powered by Rüko</div>
+            </div>
+            <div class="content">
+                <h2>E-Mail-Adresse bestätigen</h2>
+                <p class="greeting">Hallo Max Mustermann,</p>
+                <p>vielen Dank für Ihre Registrierung bei der Baumaschinen-KI von Rüko.</p>
+                <p>Um Ihr Konto zu aktivieren, bestätigen Sie bitte Ihre E-Mail-Adresse durch Klick auf die folgende Schaltfläche:</p>
+
+                <div class="button-container">
+                    <a href="https://baumaschinen-ki.rueko.de/verify-email?token=abc123def456" class="button">E-Mail-Adresse bestätigen</a>
+                </div>
+
+                <p style="font-size: 14px; color: #6b7280;">Alternativ können Sie auch folgenden Link in Ihren Browser kopieren:</p>
+                <div class="link-box">https://baumaschinen-ki.rueko.de/verify-email?token=abc123def456</div>
+
+                <div class="info-box">
+                    <p><strong>Wichtig:</strong> Dieser Bestätigungslink ist 24 Stunden gültig.</p>
+                </div>
+
+                <div class="security-notice">
+                    <p><strong>Sicherheitshinweis:</strong> Falls Sie sich nicht registriert haben, können Sie diese E-Mail ignorieren. Ihr Passwort bleibt geschützt.</p>
+                </div>
+            </div>
+            <div class="footer">
+                <p class="brand">Baumaschinen-KI</p>
+                <p class="company">Rüko GmbH &copy; 2025</p>
+                <p style="margin-top: 15px;">Diese E-Mail wurde automatisch generiert. Bitte antworten Sie nicht darauf.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

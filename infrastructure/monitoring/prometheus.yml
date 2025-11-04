@@ -1,0 +1,135 @@
+# Prometheus Configuration
+# Building Machinery AI Chatbot
+#
+# This configuration defines:
+# - Scrape intervals and timeouts
+# - Target services to monitor
+# - Alert rule files
+# - Alertmanager integration (if used)
+#
+# Last Updated: 2025-11-02
+
+global:
+  scrape_interval: 15s       # Scrape targets every 15 seconds
+  evaluation_interval: 15s    # Evaluate rules every 15 seconds
+  scrape_timeout: 10s         # Timeout after 10 seconds
+
+  # Attach these labels to any time series or alerts
+  external_labels:
+    monitor: 'chatbot-production'
+    environment: 'production'
+
+# Alertmanager configuration (optional)
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets:
+#             - 'alertmanager:9093'
+
+# Load and evaluate rules in these files
+rule_files:
+  - '/etc/prometheus/prometheus-alerts.yml'
+
+# Scrape configurations
+scrape_configs:
+  # =========================================================================
+  # Prometheus itself
+  # =========================================================================
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'
+
+  # =========================================================================
+  # FastAPI Backend Application
+  # =========================================================================
+  - job_name: 'fastapi-backend'
+    metrics_path: '/metrics'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['backend:8000']
+        labels:
+          service: 'backend'
+          application: 'chatbot'
+
+  # =========================================================================
+  # Node Exporter (System Metrics)
+  # =========================================================================
+  - job_name: 'node-exporter'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['node-exporter:9100']
+        labels:
+          service: 'node-exporter'
+          instance: 'production-server'
+
+  # =========================================================================
+  # Docker Daemon Metrics
+  # =========================================================================
+  - job_name: 'docker'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['host.docker.internal:9323']
+        labels:
+          service: 'docker'
+
+  # =========================================================================
+  # Grafana (Optional)
+  # =========================================================================
+  - job_name: 'grafana'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['grafana:3000']
+        labels:
+          service: 'grafana'
+
+  # =========================================================================
+  # Loki (Optional)
+  # =========================================================================
+  - job_name: 'loki'
+    scrape_interval: 30s
+    static_configs:
+      - targets: ['loki:3100']
+        labels:
+          service: 'loki'
+
+# =============================================================================
+# Metric Retention and Storage
+# =============================================================================
+#
+# Storage configuration is set via command-line flags in docker-compose:
+#   --storage.tsdb.path=/prometheus
+#   --storage.tsdb.retention.time=30d
+#
+# This keeps 30 days of metrics data.
+#
+# =============================================================================
+# Accessing Prometheus
+# =============================================================================
+#
+# Web UI: http://localhost:9090 (from server)
+# SSH Tunnel: ssh -L 9090:localhost:9090 deploy@your-droplet-ip
+# Then access: http://localhost:9090 (from your local machine)
+#
+# Useful PromQL Queries:
+#
+# API Request Rate:
+#   rate(http_requests_total[5m])
+#
+# Error Rate:
+#   rate(http_requests_total{status=~"5.."}[5m])
+#
+# Response Time (95th percentile):
+#   histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))
+#
+# CPU Usage:
+#   100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+#
+# Memory Usage:
+#   (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
+#
+# Container Status:
+#   up{job="fastapi-backend"}
+#
+# =============================================================================

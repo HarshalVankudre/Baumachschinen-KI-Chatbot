@@ -1,0 +1,138 @@
+# =============================================================================
+# Docker Compose for Baumaschinen-KI Application
+# =============================================================================
+# Purpose: Local testing and production deployment orchestration
+# Services: Backend (FastAPI), Frontend (React + Nginx)
+# External: MongoDB Atlas, Pinecone (cloud-hosted)
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # Backend Service - FastAPI Python Application
+  # ===========================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: registry.digitalocean.com/ruekogpt1/baumaschinen-backend:latest
+    container_name: baumaschinen-backend
+    restart: unless-stopped
+
+    ports:
+      - "8000:8000"
+
+    environment:
+      # Application settings
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      SECRET_KEY: ${SECRET_KEY}
+      API_INTERNAL_KEY: ${API_INTERNAL_KEY}
+
+      # Server configuration
+      HOST: 0.0.0.0
+      PORT: 8000
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+
+      # MongoDB Atlas (external)
+      MONGODB_URI: ${MONGODB_URI}
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-building_machinery_chatbot}
+
+      # Pinecone (external)
+      PINECONE_API_KEY: ${PINECONE_API_KEY}
+      PINECONE_ENVIRONMENT: ${PINECONE_ENVIRONMENT:-us-east-1}
+      PINECONE_INDEX_NAME: ${PINECONE_INDEX_NAME:-building-machinery-docs}
+
+      # OpenAI
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-4o-mini}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-large}
+
+      # Email (SMTP)
+      SMTP_HOST: ${SMTP_HOST:-smtp.office365.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+
+      # Frontend URL
+      FRONTEND_URL: ${FRONTEND_URL}
+
+      # Optional: Sentry
+      SENTRY_DSN: ${SENTRY_DSN:-}
+
+    volumes:
+      # Logs persistence
+      - backend-logs:/app/logs
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    networks:
+      - baumaschinen-network
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # Frontend Service - React + Vite + Nginx
+  # ===========================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_APP_NAME: Baumaschinen-KI
+        VITE_ENVIRONMENT: ${ENVIRONMENT:-production}
+        BUILD_VERSION: ${BUILD_VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE}
+    image: registry.digitalocean.com/ruekogpt1/baumaschinen-frontend:latest
+    container_name: baumaschinen-frontend
+    restart: unless-stopped
+
+    ports:
+      - "3000:80"
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+    networks:
+      - baumaschinen-network
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  baumaschinen-network:
+    driver: bridge
+    name: baumaschinen-network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  backend-logs:
+    driver: local
+    name: baumaschinen-backend-logs

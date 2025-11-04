@@ -1,0 +1,281 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neue Benutzerregistrierung - Genehmigung erforderlich</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #1f2937;
+            background-color: #f3f4f6;
+            padding: 0;
+            margin: 0;
+        }
+
+        .email-wrapper {
+            width: 100%;
+            background-color: #f3f4f6;
+            padding: 20px 0;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            margin: 0 0 8px 0;
+            letter-spacing: -0.5px;
+        }
+
+        .header .subtitle {
+            font-size: 15px;
+            opacity: 0.95;
+            font-weight: 400;
+        }
+
+        .content {
+            padding: 45px 40px;
+            background-color: #ffffff;
+        }
+
+        .content h2 {
+            color: #1f2937;
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0 0 25px 0;
+        }
+
+        .content p {
+            color: #4b5563;
+            font-size: 16px;
+            line-height: 1.7;
+            margin: 0 0 20px 0;
+        }
+
+        .alert-badge {
+            display: inline-block;
+            background-color: #fef3c7;
+            color: #92400e;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .user-details-box {
+            background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 30px 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+        }
+
+        .user-details-box h3 {
+            color: #1f2937;
+            font-size: 18px;
+            margin: 0 0 20px 0;
+            font-weight: 700;
+        }
+
+        .detail-item {
+            display: flex;
+            padding: 12px 0;
+            border-bottom: 1px solid #e5e7eb;
+        }
+
+        .detail-item:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            color: #64748b;
+            min-width: 180px;
+            font-size: 15px;
+        }
+
+        .detail-value {
+            color: #1f2937;
+            font-weight: 500;
+            font-size: 15px;
+        }
+
+        .button-container {
+            text-align: center;
+            margin: 35px 0;
+        }
+
+        .button {
+            display: inline-block;
+            padding: 16px 40px;
+            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+            color: white !important;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            transition: transform 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+        }
+
+        .action-notice {
+            background-color: #fef3c7;
+            border-left: 4px solid #f59e0b;
+            padding: 16px 20px;
+            margin: 25px 0;
+            border-radius: 4px;
+        }
+
+        .action-notice p {
+            margin: 0;
+            color: #92400e;
+            font-size: 15px;
+            font-weight: 500;
+        }
+
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px 40px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .footer p {
+            color: #6b7280;
+            font-size: 14px;
+            margin: 8px 0;
+        }
+
+        .footer .brand {
+            font-weight: 600;
+            color: #2563eb;
+            font-size: 15px;
+        }
+
+        @media only screen and (max-width: 600px) {
+            .email-container {
+                border-radius: 0;
+                margin: 0;
+            }
+
+            .header {
+                padding: 30px 20px;
+            }
+
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .content {
+                padding: 30px 20px;
+            }
+
+            .content h2 {
+                font-size: 20px;
+            }
+
+            .user-details-box {
+                padding: 20px;
+            }
+
+            .detail-item {
+                flex-direction: column;
+            }
+
+            .detail-label {
+                min-width: auto;
+                margin-bottom: 4px;
+            }
+
+            .button {
+                padding: 14px 30px;
+                font-size: 15px;
+            }
+
+            .footer {
+                padding: 25px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="header">
+                <h1>Neue Benutzerregistrierung</h1>
+                <div class="subtitle">Genehmigung erforderlich</div>
+            </div>
+            <div class="content">
+                <div style="text-align: center;">
+                    <span class="alert-badge">AKTION ERFORDERLICH</span>
+                </div>
+
+                <h2>Administrator-Benachrichtigung</h2>
+                <p>Sehr geehrte Administration,</p>
+                <p>ein neuer Benutzer hat sich erfolgreich registriert und die E-Mail-Verifizierung abgeschlossen. Der Benutzer wartet nun auf Ihre Genehmigung.</p>
+
+                <div class="user-details-box">
+                    <h3>Benutzer-Details</h3>
+                    <div class="detail-item">
+                        <div class="detail-label">Benutzername:</div>
+                        <div class="detail-value">Max Mustermann</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">E-Mail-Adresse:</div>
+                        <div class="detail-value">max.mustermann@example.com</div>
+                    </div>
+                    <div class="detail-item">
+                        <div class="detail-label">Registriert am:</div>
+                        <div class="detail-value">04.11.2025 13:22:23</div>
+                    </div>
+                </div>
+
+                <div class="action-notice">
+                    <p><strong>Hinweis:</strong> Bitte prüfen Sie die Registrierung und treffen Sie eine Entscheidung über die Genehmigung oder Ablehnung.</p>
+                </div>
+
+                <p style="text-align: center; margin-top: 30px;">Öffnen Sie das Admin-Dashboard, um den Benutzer zu genehmigen oder abzulehnen:</p>
+
+                <div class="button-container">
+                    <a href="https://baumaschinen-ki.rueko.de/admin/users" class="button">Zum Admin-Dashboard</a>
+                </div>
+            </div>
+            <div class="footer">
+                <p class="brand">Baumaschinen-KI Admin-System</p>
+                <p>Rüko GmbH &copy; 2025</p>
+                <p style="margin-top: 15px;">Diese E-Mail wurde automatisch generiert. Bitte antworten Sie nicht darauf.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

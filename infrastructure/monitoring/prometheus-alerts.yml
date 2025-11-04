@@ -1,0 +1,351 @@
+# Prometheus Alert Rules
+# Building Machinery AI Chatbot
+#
+# This file defines alerting rules for critical system issues.
+# Alerts are grouped by category:
+# - API Performance Alerts
+# - System Resource Alerts
+# - Database Connectivity Alerts
+# - Container Health Alerts
+#
+# Last Updated: 2025-11-02
+
+groups:
+  # ===========================================================================
+  # API PERFORMANCE ALERTS
+  # ===========================================================================
+  - name: api_alerts
+    interval: 30s
+    rules:
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          category: api
+        annotations:
+          summary: "High API error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} (threshold: 5%)"
+          impact: "Users may be experiencing service issues"
+          action: "Check application logs and backend health"
+
+      - alert: SlowResponseTime
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 3
+        for: 5m
+        labels:
+          severity: warning
+          category: api
+        annotations:
+          summary: "Slow API response times detected"
+          description: "95th percentile response time is {{ $value }}s (threshold: 3s)"
+          impact: "Users experiencing slow performance"
+          action: "Check system resources and database performance"
+
+      - alert: HighRequestRate
+        expr: rate(http_requests_total[1m]) > 100
+        for: 5m
+        labels:
+          severity: warning
+          category: api
+        annotations:
+          summary: "Unusually high request rate"
+          description: "Request rate is {{ $value }} req/s (threshold: 100 req/s)"
+          impact: "Possible traffic spike or DDoS attack"
+          action: "Monitor traffic patterns and check rate limiting"
+
+      - alert: NoRequestsReceived
+        expr: rate(http_requests_total[5m]) == 0
+        for: 10m
+        labels:
+          severity: warning
+          category: api
+        annotations:
+          summary: "No API requests received"
+          description: "Backend has not received requests for 10 minutes"
+          impact: "Service may be unreachable or Nginx routing issue"
+          action: "Check Nginx configuration and network connectivity"
+
+  # ===========================================================================
+  # SERVICE AVAILABILITY ALERTS
+  # ===========================================================================
+  - name: service_alerts
+    interval: 30s
+    rules:
+      - alert: ServiceDown
+        expr: up{job="fastapi-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: service
+        annotations:
+          summary: "Backend service is down"
+          description: "Backend service has been unreachable for 1 minute"
+          impact: "Application is completely unavailable to users"
+          action: "Check container status and logs immediately"
+
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: warning
+          category: monitoring
+        annotations:
+          summary: "Prometheus target {{ $labels.job }} is down"
+          description: "Target {{ $labels.instance }} has been down for 5 minutes"
+          impact: "Metrics not being collected for this service"
+          action: "Check target availability and configuration"
+
+  # ===========================================================================
+  # SYSTEM RESOURCE ALERTS
+  # ===========================================================================
+  - name: system_alerts
+    interval: 30s
+    rules:
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+          category: system
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value | humanize }}% (threshold: 80%)"
+          impact: "Performance degradation possible"
+          action: "Check running processes and consider scaling"
+
+      - alert: CriticalCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 95
+        for: 5m
+        labels:
+          severity: critical
+          category: system
+        annotations:
+          summary: "Critical CPU usage detected"
+          description: "CPU usage is {{ $value | humanize }}% (threshold: 95%)"
+          impact: "Severe performance degradation"
+          action: "Investigate immediately, may need to scale droplet"
+
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          category: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value | humanize }}% (threshold: 85%)"
+          impact: "Risk of OOM kills and service interruption"
+          action: "Check memory-intensive processes"
+
+      - alert: CriticalMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 95
+        for: 5m
+        labels:
+          severity: critical
+          category: system
+        annotations:
+          summary: "Critical memory usage detected"
+          description: "Memory usage is {{ $value | humanize }}% (threshold: 95%)"
+          impact: "Imminent risk of OOM kills"
+          action: "Restart services or scale droplet immediately"
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 20
+        for: 5m
+        labels:
+          severity: warning
+          category: system
+        annotations:
+          summary: "Low disk space on root partition"
+          description: "Only {{ $value | humanize }}% disk space available (threshold: 20%)"
+          impact: "Risk of disk full errors"
+          action: "Clean up logs, old Docker images, and backups"
+
+      - alert: DiskSpaceCritical
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 10
+        for: 2m
+        labels:
+          severity: critical
+          category: system
+        annotations:
+          summary: "Critical disk space on root partition"
+          description: "Only {{ $value | humanize }}% disk space available (threshold: 10%)"
+          impact: "Services may fail due to no disk space"
+          action: "Free up disk space immediately"
+
+      - alert: HighDiskIO
+        expr: rate(node_disk_io_time_seconds_total[5m]) > 0.8
+        for: 10m
+        labels:
+          severity: warning
+          category: system
+        annotations:
+          summary: "High disk I/O detected"
+          description: "Disk I/O utilization is {{ $value | humanizePercentage }}"
+          impact: "Disk performance bottleneck"
+          action: "Check for processes with high I/O"
+
+  # ===========================================================================
+  # CONTAINER HEALTH ALERTS
+  # ===========================================================================
+  - name: container_alerts
+    interval: 30s
+    rules:
+      - alert: ContainerRestarting
+        expr: rate(docker_container_restarts_total[15m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          category: container
+        annotations:
+          summary: "Container {{ $labels.container }} is restarting"
+          description: "Container has restarted {{ $value }} times in 15 minutes"
+          impact: "Service instability"
+          action: "Check container logs for crash reasons"
+
+      - alert: ContainerHighMemory
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          category: container
+        annotations:
+          summary: "Container {{ $labels.container }} high memory usage"
+          description: "Memory usage is {{ $value | humanize }}% of limit"
+          impact: "Container may be killed by OOM"
+          action: "Investigate memory leaks or increase limits"
+
+  # ===========================================================================
+  # DATABASE & EXTERNAL SERVICE ALERTS
+  # ===========================================================================
+  - name: database_alerts
+    interval: 30s
+    rules:
+      - alert: MongoDBConnectionFailed
+        expr: mongodb_up == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: database
+        annotations:
+          summary: "MongoDB connection failed"
+          description: "Unable to connect to MongoDB Atlas"
+          impact: "Application cannot access data"
+          action: "Check MongoDB Atlas status and network connectivity"
+
+      - alert: PineconeHighLatency
+        expr: pinecone_query_duration_seconds > 2
+        for: 5m
+        labels:
+          severity: warning
+          category: database
+        annotations:
+          summary: "Pinecone query latency is high"
+          description: "Average query latency is {{ $value }}s (threshold: 2s)"
+          impact: "Slow search responses for users"
+          action: "Check Pinecone service status"
+
+      - alert: OpenAIHighLatency
+        expr: openai_api_duration_seconds > 10
+        for: 5m
+        labels:
+          severity: warning
+          category: external_api
+        annotations:
+          summary: "OpenAI API latency is high"
+          description: "Average API latency is {{ $value }}s (threshold: 10s)"
+          impact: "Slow chat responses"
+          action: "Check OpenAI service status"
+
+      - alert: OpenAIRateLimitExceeded
+        expr: rate(openai_rate_limit_errors_total[5m]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          category: external_api
+        annotations:
+          summary: "OpenAI rate limit exceeded"
+          description: "Rate limit errors: {{ $value }}"
+          impact: "Some user requests failing"
+          action: "Review usage patterns and consider rate limiting users"
+
+  # ===========================================================================
+  # MONITORING STACK ALERTS
+  # ===========================================================================
+  - name: monitoring_alerts
+    interval: 60s
+    rules:
+      - alert: PrometheusConfigReload
+        expr: prometheus_config_last_reload_successful == 0
+        for: 5m
+        labels:
+          severity: warning
+          category: monitoring
+        annotations:
+          summary: "Prometheus configuration reload failed"
+          description: "Last config reload failed"
+          impact: "Using outdated Prometheus configuration"
+          action: "Check Prometheus logs and configuration syntax"
+
+      - alert: GrafanaDown
+        expr: up{job="grafana"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          category: monitoring
+        annotations:
+          summary: "Grafana is down"
+          description: "Grafana has been unreachable for 5 minutes"
+          impact: "Cannot view dashboards"
+          action: "Check Grafana container status"
+
+      - alert: LokiDown
+        expr: up{job="loki"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          category: monitoring
+        annotations:
+          summary: "Loki is down"
+          description: "Loki has been unreachable for 5 minutes"
+          impact: "Logs not being collected"
+          action: "Check Loki container status"
+
+# =============================================================================
+# Alert Severity Levels
+# =============================================================================
+#
+# Critical:
+#   - Immediate action required
+#   - Service is down or severely degraded
+#   - User impact is significant
+#   - Examples: Service down, critical resource exhaustion
+#
+# Warning:
+#   - Attention needed soon
+#   - Service degraded but operational
+#   - Potential for critical issues
+#   - Examples: High resource usage, slow performance
+#
+# Info:
+#   - Informational only
+#   - No immediate action required
+#   - Used for tracking and analysis
+#
+# =============================================================================
+# Alert Actions
+# =============================================================================
+#
+# When alert fires:
+# 1. Check Grafana dashboards for visual context
+# 2. View logs: docker compose logs -f <service>
+# 3. Check resource usage: docker stats
+# 4. Review recent deployments
+# 5. Execute appropriate runbook procedure
+#
+# Alert delivery methods:
+# - Prometheus web UI (Alerts tab)
+# - Grafana dashboards (alert panels)
+# - Alertmanager (if configured) -> Email, Slack, PagerDuty
+#
+# =============================================================================

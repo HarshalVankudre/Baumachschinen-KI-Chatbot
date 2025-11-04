@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  # Backend API
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+    env_file:
+      - .env
+    volumes:
+      # Mount code for hot reload in development
+      - ./app:/app/app:ro
+    depends_on:
+      - mongodb
+    networks:
+      - chatbot-network
+    restart: unless-stopped
+
+  # MongoDB for local development
+  mongodb:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=building_machinery_chatbot
+    volumes:
+      - mongodb-data:/data/db
+    networks:
+      - chatbot-network
+    restart: unless-stopped
+
+volumes:
+  mongodb-data:
+
+networks:
+  chatbot-network:
+    driver: bridge

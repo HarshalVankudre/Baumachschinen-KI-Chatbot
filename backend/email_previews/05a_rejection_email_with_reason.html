@@ -1,0 +1,255 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registrierung nicht genehmigt</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            color: #1f2937;
+            background-color: #f3f4f6;
+            padding: 0;
+            margin: 0;
+        }
+
+        .email-wrapper {
+            width: 100%;
+            background-color: #f3f4f6;
+            padding: 20px 0;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+        }
+
+        .header {
+            background: linear-gradient(135deg, #64748b 0%, #475569 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 26px;
+            font-weight: 700;
+            margin: 0 0 8px 0;
+            letter-spacing: -0.5px;
+        }
+
+        .header .subtitle {
+            font-size: 16px;
+            opacity: 0.95;
+            font-weight: 400;
+        }
+
+        .content {
+            padding: 45px 40px;
+            background-color: #ffffff;
+        }
+
+        .content h2 {
+            color: #1f2937;
+            font-size: 24px;
+            font-weight: 700;
+            margin: 0 0 25px 0;
+        }
+
+        .content p {
+            color: #4b5563;
+            font-size: 16px;
+            line-height: 1.7;
+            margin: 0 0 20px 0;
+        }
+
+        .greeting {
+            color: #1f2937;
+            font-weight: 600;
+            font-size: 17px;
+        }
+
+        .status-message {
+            background-color: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 30px 0;
+            text-align: center;
+        }
+
+        .status-message p {
+            margin: 0;
+            color: #64748b;
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .reason-box {
+            background-color: #fff7ed;
+            border-left: 4px solid #f59e0b;
+            padding: 20px 25px;
+            margin: 25px 0;
+            border-radius: 4px;
+        }
+
+        .reason-box .reason-label {
+            font-weight: 700;
+            color: #92400e;
+            font-size: 16px;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .reason-box .reason-text {
+            color: #92400e;
+            font-size: 15px;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        .contact-box {
+            background-color: #f0f9ff;
+            border: 2px solid #2563eb;
+            border-radius: 10px;
+            padding: 25px;
+            margin: 30px 0;
+        }
+
+        .contact-box h3 {
+            color: #1e40af;
+            font-size: 18px;
+            font-weight: 700;
+            margin: 0 0 15px 0;
+        }
+
+        .contact-box p {
+            margin: 10px 0;
+            color: #1e40af;
+            font-size: 15px;
+        }
+
+        .contact-email {
+            display: inline-block;
+            color: #2563eb;
+            font-weight: 600;
+            text-decoration: none;
+            font-size: 16px;
+            padding: 8px 16px;
+            background-color: #dbeafe;
+            border-radius: 6px;
+            margin-top: 8px;
+        }
+
+        .footer {
+            background-color: #f9fafb;
+            padding: 30px 40px;
+            text-align: center;
+            border-top: 1px solid #e5e7eb;
+        }
+
+        .footer p {
+            color: #6b7280;
+            font-size: 14px;
+            margin: 8px 0;
+        }
+
+        .footer .brand {
+            font-weight: 600;
+            color: #2563eb;
+            font-size: 15px;
+        }
+
+        .footer .company {
+            color: #4b5563;
+            font-weight: 500;
+        }
+
+        @media only screen and (max-width: 600px) {
+            .email-container {
+                border-radius: 0;
+                margin: 0;
+            }
+
+            .header {
+                padding: 30px 20px;
+            }
+
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .content {
+                padding: 30px 20px;
+            }
+
+            .content h2 {
+                font-size: 20px;
+            }
+
+            .status-message,
+            .reason-box,
+            .contact-box {
+                padding: 20px;
+            }
+
+            .footer {
+                padding: 25px 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+            <div class="header">
+                <h1>Registrierung nicht genehmigt</h1>
+                <div class="subtitle">Baumaschinen-KI</div>
+            </div>
+            <div class="content">
+                <h2>Aktualisierung zur Kontoregistrierung</h2>
+                <p class="greeting">Hallo Max Mustermann,</p>
+                <p>vielen Dank für Ihr Interesse an der Baumaschinen-KI von Rüko.</p>
+
+                <div class="status-message">
+                    <p>Leider können wir Ihre Registrierung derzeit nicht genehmigen.</p>
+                </div>
+
+                
+                <div class="reason-box">
+                    <span class="reason-label">Grund der Ablehnung:</span>
+                    <p class="reason-text">Die angegebene E-Mail-Adresse gehört nicht zu einer autorisierten Organisation.</p>
+                </div>
+                
+
+                <p>Falls Sie der Meinung sind, dass es sich um einen Fehler handelt oder Sie weitere Informationen benötigen, wenden Sie sich bitte an unseren Support.</p>
+
+                <div class="contact-box">
+                    <h3>Kontakt & Support</h3>
+                    <p>Bei Fragen oder Unklarheiten stehen wir Ihnen gerne zur Verfügung:</p>
+                    <a href="mailto:support@rueko.de" class="contact-email">support@rueko.de</a>
+                </div>
+
+                <p style="color: #6b7280; font-size: 15px; margin-top: 30px;">Wir bedauern, dass wir Ihnen keine positivere Nachricht übermitteln können, und danken Ihnen für Ihr Verständnis.</p>
+            </div>
+            <div class="footer">
+                <p class="brand">Baumaschinen-KI</p>
+                <p class="company">Rüko GmbH &copy; 2025</p>
+                <p style="margin-top: 15px;">Diese E-Mail wurde automatisch generiert. Bitte antworten Sie nicht darauf.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
