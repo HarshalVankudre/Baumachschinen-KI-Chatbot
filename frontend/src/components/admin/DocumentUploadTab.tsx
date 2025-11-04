@@ -32,7 +32,7 @@ export function DocumentUploadTab() {
   const queryClient = useQueryClient();
 
   // Fetch documents
-  const { data: documentsData, isLoading, refetch } = useQuery({
+  const { data: documentsData, isLoading } = useQuery({
     queryKey: ['documents'],
     queryFn: () => documentService.getDocuments(),
   });
@@ -97,7 +97,7 @@ export function DocumentUploadTab() {
       }
     };
 
-    eventSource.onerror = (error) => {
+    eventSource.onerror = (_error) => {
       console.log('SSE connection error/closed for document:', documentId);
       eventSource.close();
       activeStreamsRef.current.delete(documentId);

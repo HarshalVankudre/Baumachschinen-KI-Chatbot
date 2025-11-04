@@ -31,7 +31,7 @@ export default function ChatPage() {
   });
 
   // Fetch messages for active conversation
-  const { data: currentConversation, isLoading: messagesLoading, refetch: refetchMessages } = useQuery({
+  const { data: currentConversation, isLoading: messagesLoading } = useQuery({
     queryKey: ['conversation', activeConversationId],
     queryFn: () =>
       activeConversationId

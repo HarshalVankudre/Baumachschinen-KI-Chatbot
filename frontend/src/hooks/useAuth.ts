@@ -12,7 +12,7 @@ export function useAuth() {
     setError(null);
     try {
       const response = await authService.login(username, password);
-      setUser(response);
+      setUser(response.user);
       return response;
     } catch (err: any) {
       const errorMsg = err.response?.data?.message || 'Login failed';

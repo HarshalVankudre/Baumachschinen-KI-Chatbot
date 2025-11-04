@@ -40,7 +40,7 @@ interface SuspendDialogState {
 }
 
 export function AllUsersTab() {
-  const queryClient = useQueryClient();
+  const _queryClient = useQueryClient();
 
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');

@@ -29,6 +29,9 @@ coverage/
 *.spec.tsx
 *.spec.js
 *.spec.jsx
+**/__tests__/
+e2e/
+tests/
 
 # IDE and editor files
 .vscode/
