@@ -11,10 +11,28 @@ export function useAuth() {
     setLoading(true);
     setError(null);
     try {
+      console.log('[useAuth] Calling authService.login');
       const response = await authService.login(username, password);
-      setUser(response.user);
+      console.log('[useAuth] Login response:', response);
+
+      // Backend returns user data directly (not nested in response.user)
+      if (!response || !response.user_id) {
+        console.error('[useAuth] Invalid response structure:', response);
+        throw new Error('Invalid login response');
+      }
+
+      // Ensure user is set in store before returning
+      console.log('[useAuth] Setting user in store:', response);
+      setUser(response);
+
+      // Small delay to ensure Zustand persist middleware has time to save
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // Return the full response for the component to use
+      console.log('[useAuth] Returning successful response');
       return response;
     } catch (err: any) {
+      console.error('[useAuth] Login failed:', err);
       const errorMsg = err.response?.data?.message || 'Login failed';
       setError(errorMsg);
       throw err;

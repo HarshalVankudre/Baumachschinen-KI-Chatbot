@@ -29,12 +29,9 @@ const queryClient = new QueryClient({
   },
 });
 
-function App() {
+function AppRoutes() {
   return (
-    <ErrorBoundary>
-      <QueryClientProvider client={queryClient}>
-        <Router>
-          <Routes>
+    <Routes>
           {/* Public routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
@@ -81,7 +78,16 @@ function App() {
           {/* Default redirect */}
           <Route path="/" element={<RootRedirect />} />
           <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
+      </Routes>
+  );
+}
+
+function App() {
+  return (
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
+        <Router>
+          <AppRoutes />
         </Router>
         <Toaster />
       </QueryClientProvider>

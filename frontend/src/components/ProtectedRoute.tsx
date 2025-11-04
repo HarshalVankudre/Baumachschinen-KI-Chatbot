@@ -13,13 +13,18 @@ export function ProtectedRoute({
 }: ProtectedRouteProps) {
   const { isAuthenticated, user } = useAuthStore();
 
+  console.log('[ProtectedRoute] Checking auth:', { isAuthenticated, user, requiredLevel });
+
   if (!isAuthenticated) {
+    console.log('[ProtectedRoute] Not authenticated, redirecting to /login');
     return <Navigate to="/login" replace />;
   }
 
   if (requiredLevel && user && !requiredLevel.includes(user.authorization_level)) {
+    console.log('[ProtectedRoute] Insufficient authorization level, redirecting to /forbidden');
     return <Navigate to="/forbidden" replace />;
   }
 
+  console.log('[ProtectedRoute] Auth check passed, rendering protected content');
   return <>{children}</>;
 }

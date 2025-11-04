@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { PasswordInput } from '@/components/shared/PasswordInput';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthStore } from '@/store/authStore';
 
 export default function LoginPage() {
   const [username, setUsername] = useState('');
@@ -18,6 +19,15 @@ export default function LoginPage() {
   const { login, loading } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuthStore();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log('[LoginPage] Already authenticated, redirecting to /chat');
+      navigate('/chat', { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const validate = () => {
     const newErrors: Record<string, string> = {};
@@ -46,13 +56,37 @@ export default function LoginPage() {
     }
 
     try {
-      await login(username, password);
-      toast({
-        title: 'Erfolgreich',
-        description: 'Erfolgreich angemeldet',
-      });
-      navigate('/chat');
+      console.log('[LoginPage] Starting login attempt for user:', username);
+      const response = await login(username, password);
+      console.log('[LoginPage] Login response received:', response);
+
+      // Check if we got a valid response with user data (response IS the user object)
+      if (response && response.user_id) {
+        console.log('[LoginPage] Login successful, user:', response);
+
+        // Show success message
+        toast({
+          title: 'Erfolgreich',
+          description: 'Erfolgreich angemeldet',
+        });
+
+        // Navigate immediately after successful login
+        // Don't wait for state updates - the auth store will handle that
+        console.log('[LoginPage] Navigating to /chat');
+        navigate('/chat', { replace: true });
+      } else {
+        // This shouldn't happen with a 200 response, but handle it just in case
+        console.error('[LoginPage] Login response missing user data:', response);
+        setErrors({ general: 'Anmeldung fehlgeschlagen. Ungültige Serverantwort.' });
+        toast({
+          title: 'Anmeldung fehlgeschlagen',
+          description: 'Ungültige Serverantwort',
+          variant: 'destructive',
+        });
+      }
     } catch (error: any) {
+      console.error('[LoginPage] Login error:', error);
+
       // Handle different error scenarios
       const status = error.response?.status;
       const message = error.response?.data?.message;

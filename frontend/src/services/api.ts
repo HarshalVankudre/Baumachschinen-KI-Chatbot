@@ -34,11 +34,27 @@ apiClient.interceptors.response.use(
   },
   (error: AxiosError) => {
     const status = error.response?.status;
+    const url = error.config?.url;
 
-    if (status === 401) {
-      // Unauthorized - redirect to login
-      useAuthStore.getState().logout();
-      window.location.href = '/login';
+    // Don't redirect on auth-related endpoint failures
+    const isAuthEndpoint = url?.includes('/auth/');
+
+    if (status === 401 && !isAuthEndpoint) {
+      // Unauthorized - clear auth state
+      const authStore = useAuthStore.getState();
+
+      // Only logout if we're actually authenticated
+      // This prevents issues during login
+      if (authStore.isAuthenticated) {
+        console.log('[API Interceptor] 401 Unauthorized - clearing auth state');
+        authStore.logout();
+
+        // Only redirect if not already on login page
+        if (window.location.pathname !== '/login') {
+          // Use window.location for redirect to ensure clean state
+          window.location.replace('/login');
+        }
+      }
     } else if (status === 403) {
       // Forbidden - show error
       console.error('Access forbidden:', error.response?.data);

@@ -3,10 +3,13 @@ import type { LoginResponse, User } from '@/types';
 
 export const authService = {
   async login(username: string, password: string): Promise<LoginResponse> {
+    console.log('[authService] Sending login request for:', username);
     const response = await apiClient.post('/api/auth/login', {
       username,
       password,
     });
+    console.log('[authService] API response:', response);
+    console.log('[authService] API response.data:', response.data);
     return response.data;
   },
 
