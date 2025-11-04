@@ -119,7 +119,7 @@ export function DocumentUpload() {
     // Upload files sequentially if more than 5 total
     for (const uploadingFile of queuedFiles) {
       try {
-        const _response = await documentService.uploadDocument(
+        await documentService.uploadDocument(
           uploadingFile.file,
           selectedCategory,
           (progress) => {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { Check, X } from 'lucide-react';
 import {
@@ -43,8 +43,6 @@ interface RejectDialogState {
 }
 
 export function PendingApprovalsTab() {
-  const _queryClient = useQueryClient();
-
   const [approvalDialog, setApprovalDialog] = useState<ApprovalDialogState>({
     open: false,
     userId: null,
