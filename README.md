@@ -12,7 +12,7 @@
 <h3>🤖 AI-Powered Construction Machinery Expert System</h3>
 <p>An intelligent chatbot specialized in construction machinery (Baumaschinen) queries, powered by GPT-4 and advanced RAG technology.</p>
 
-[🚀 Live Demo](#) | [📖 Documentation](#documentation) | [🐛 Report Bug](https://github.com/HarshalVankudre/Internal_AI_Chatbot/issues) | [✨ Request Feature](https://github.com/HarshalVankudre/Internal_AI_Chatbot/issues)
+[🚀 Live Demo](#) | [📖 Documentation](#documentation) | [🐛 Report Bug](https://github.com/HarshalVankudre/Baumachschinen-KI-Chatbot/issues) | [✨ Request Feature](https://github.com/HarshalVankudre/Baumachschinen-KI-Chatbot/issues)
 
 </div>
 
@@ -140,7 +140,7 @@ graph TB
 ### 🏃‍♂️ One-Line Setup
 
 ```bash
-git clone https://github.com/HarshalVankudre/Internal_AI_Chatbot.git && cd Internal_AI_Chatbot && ./setup.sh
+git clone https://github.com/HarshalVankudre/Baumachschinen-KI-Chatbot.git && cd Baumachschinen-KI-Chatbot && ./setup.sh
 ```
 
 ---
@@ -151,8 +151,8 @@ git clone https://github.com/HarshalVankudre/Internal_AI_Chatbot.git && cd Inter
 
 ```bash
 # Clone the repository
-git clone https://github.com/HarshalVankudre/Internal_AI_Chatbot.git
-cd Internal_AI_Chatbot
+git clone https://github.com/HarshalVankudre/Baumachschinen-KI-Chatbot.git
+cd Baumachschinen-KI-Chatbot
 ```
 
 ### 🔙 Backend Setup
@@ -452,15 +452,15 @@ docker-compose ps
 ### 📊 Benchmarks
 
 ```
-┌────────────────────────────────────┐
-│ Metric          │ Target │ Actual  │
-├─────────────────┼────────┼─────────┤
-│ First Paint     │ <1.5s  │ 0.8s    │
-│ Time to Interactive │ <3s │ 2.1s    │
-│ API Response    │ <200ms │ 150ms   │
-│ Chat Stream     │ <100ms │ 50ms    │
-│ Document Upload │ <5s/MB │ 3s/MB   │
-└────────────────────────────────────┘
+┌─────────────────────┬────────┬─────────┐
+│ Metric              │ Target │ Actual  │
+├─────────────────────┼────────┼─────────┤
+│ First Paint         │ <1.5s  │ 0.8s    │
+│ Time to Interactive │ <3s    │ 2.1s    │
+│ API Response        │ <200ms │ 150ms   │
+│ Chat Stream         │ <100ms │ 50ms    │
+│ Document Upload     │ <5s/MB │ 3s/MB   │
+└─────────────────────┴────────┴─────────┘
 ```
 
 ---
@@ -495,7 +495,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- 🏢 **Rueko GmbH** - For project sponsorship
+- 🏢 **RÜKO GmbH** - For project sponsorship and employment
 - 🤖 **OpenAI** - For GPT-4 API
 - 📊 **Pinecone** - For vector database
 - 🌍 **MongoDB Atlas** - For cloud database
@@ -508,6 +508,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 <div align="center">
 
 ### 👤 Harshal Vankudre
+**Software Developer at RÜKO GmbH**
 
 [![GitHub](https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white)](https://github.com/HarshalVankudre)
 [![LinkedIn](https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white)](https://linkedin.com/in/harshalvankudre)
@@ -515,7 +516,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ### 🐛 Found a Bug?
 
-[Create an Issue](https://github.com/HarshalVankudre/Internal_AI_Chatbot/issues) • [Request a Feature](https://github.com/HarshalVankudre/Internal_AI_Chatbot/issues)
+[Create an Issue](https://github.com/HarshalVankudre/Baumachschinen-KI-Chatbot/issues) • [Request a Feature](https://github.com/HarshalVankudre/Baumachschinen-KI-Chatbot/issues)
 
 </div>
 
@@ -523,7 +524,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 <div align="center">
 
-Made with ❤️ by [Harshal Vankudre](https://github.com/HarshalVankudre)
+Developed for **RÜKO GmbH** by [Harshal Vankudre](https://github.com/HarshalVankudre)
+
+© 2024 RÜKO GmbH - All Rights Reserved
 
 ⭐ Star us on GitHub — it helps!
 
