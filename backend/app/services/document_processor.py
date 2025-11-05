@@ -12,13 +12,29 @@ Handles document processing workflow:
 import logging
 import os
 import time
+import warnings
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import uuid
 
+# Fix PIL DecompressionBombWarning for large PDF images
+# PDFs converted to high-resolution images can exceed PIL's default 89MP limit
+# Increase to 200MP to handle large technical diagrams/flowcharts
+from PIL import Image
+Image.MAX_IMAGE_PIXELS = 200_000_000  # 200 megapixels (was 89 MP by default)
+
 # Document processing libraries
 try:
-    from docling.document_converter import DocumentConverter
+    from docling.document_converter import DocumentConverter, PdfFormatOption
+    from docling.datamodel.base_models import InputFormat
+    from docling.datamodel.pipeline_options import (
+        PdfPipelineOptions,
+        EasyOcrOptions,
+        TableFormerMode,
+        PictureDescriptionApiOptions
+    )
+    from docling.datamodel.accelerator_options import AcceleratorOptions, AcceleratorDevice
+    from docling.datamodel.settings import settings as docling_settings
     DOCLING_AVAILABLE = True
 except ImportError:
     DOCLING_AVAILABLE = False
@@ -53,10 +69,121 @@ class DocumentProcessor:
         except KeyError:
             self.encoding = tiktoken.get_encoding("cl100k_base")
 
-        # Initialize Docling converter if available
+        # Initialize Docling converter with advanced optimization if available
         if DOCLING_AVAILABLE:
-            self.converter = DocumentConverter()
-            logger.info("Docling DocumentConverter initialized")
+            # Suppress PyTorch pin_memory warning when no GPU is available
+            warnings.filterwarnings("ignore", message=".*pin_memory.*no accelerator.*")
+
+            # Configure CPU optimization - use all available cores
+            import multiprocessing
+            num_cores = multiprocessing.cpu_count()
+
+            logger.info(f"Configuring Docling with {num_cores} CPU cores for maximum performance")
+
+            # Configure accelerator options for maximum CPU utilization
+            accelerator_options = AcceleratorOptions(
+                num_threads=num_cores,  # Use all CPU cores
+                device=AcceleratorDevice.CPU  # Force CPU (works on all systems)
+            )
+
+            # Configure advanced OCR options for better quality
+            ocr_options = EasyOcrOptions(
+                force_full_page_ocr=True,  # Full page OCR for maximum quality
+                use_gpu=False,  # Use CPU (GPU requires specific setup)
+            )
+
+            # Configure GPT-4 Vision API for chart/diagram/flowchart extraction
+            # Get OpenAI API key from settings
+            openai_api_key = settings.openai_api_key
+
+            if not openai_api_key:
+                raise ValueError("OpenAI API key not configured in settings")
+
+            gpt4_vision_options = PictureDescriptionApiOptions(
+                url="https://api.openai.com/v1/chat/completions",
+                params=dict(
+                    model="gpt-4.1-2025-04-14",  # Latest GPT-4 with vision (gpt-4o or gpt-4-turbo)
+                    max_tokens=8192,  # Increased to 8192 for very detailed extraction (GPT-4o supports up to 16K)
+                ),
+                headers={
+                    "Authorization": f"Bearer {openai_api_key}"
+                },
+                prompt=(
+                    "Extrahiere ALLE Informationen aus diesem Bild mit MAXIMALER Detailgenauigkeit:\n\n"
+                    "1. TEXTEXTRAKTION: Lese und transkribiere JEDES sichtbare Textzeichen, einschließlich:\n"
+                    "   - Alle Überschriften, Beschriftungen, Bildunterschriften und Anmerkungen\n"
+                    "   - Zahlen, Werte, Einheiten und Messungen\n"
+                    "   - Legenden, Schlüssel und Fußnoten\n\n"
+                    "2. DIAGRAMME & GRAPHEN: Falls vorhanden, beschreibe:\n"
+                    "   - Diagrammtyp (Balken-, Linien-, Kreis-, Streudiagramm usw.)\n"
+                    "   - Achsenbeschriftungen, Einheiten und Skalenbereiche\n"
+                    "   - ALLE Datenpunkte und ihre exakten Werte\n"
+                    "   - Gezeigte Trends, Muster und Beziehungen\n\n"
+                    "3. TABELLEN: Falls vorhanden, extrahiere:\n"
+                    "   - Spaltenüberschriften und Zeilenbeschriftungen\n"
+                    "   - JEDEN Zellenwert in strukturiertem Format\n"
+                    "   - Alle Summen, Zwischensummen oder Berechnungen\n\n"
+                    "4. DIAGRAMME & FLUSSDIAGRAMME: Falls vorhanden, beschreibe:\n"
+                    "   - Alle Formen, Kästchen und deren Textinhalt\n"
+                    "   - Pfeile, Verbindungen und Flussrichtung\n"
+                    "   - Prozessschritte und Entscheidungspunkte\n"
+                    "   - Beziehungen zwischen Komponenten\n\n"
+                    "5. TECHNISCHER INHALT: Beinhalte:\n"
+                    "   - Formeln, Gleichungen und mathematische Ausdrücke\n"
+                    "   - Symbole, Notationen und Fachbegriffe\n"
+                    "   - Messungen, Spezifikationen und Parameter\n\n"
+                    "Sei umfassend und präzise. Fasse NICHTS zusammen - extrahiere ALLES auf Deutsch."
+                ),
+                scale=3.0,  # Maximum quality image processing (3x resolution)
+                timeout=600,  # 10 minutes per image for very large/complex documents
+                batch_size=2,  # Process 2 images at a time (GPT-4 API rate limit consideration)
+            )
+
+            # Configure PDF pipeline with advanced options
+            pipeline_options = PdfPipelineOptions(
+                accelerator_options=accelerator_options,
+                do_ocr=True,  # Enable OCR for text (GPT-4 Vision also has OCR, but traditional OCR is faster for pure text)
+                do_table_structure=True,  # Enable table extraction
+                do_picture_description=True,  # Enable GPT-4 Vision for charts/diagrams/flowcharts
+                ocr_options=ocr_options,
+                picture_description_options=gpt4_vision_options,  # GPT-4 Vision API
+                generate_page_images=False,  # Don't generate full page images (saves memory)
+                generate_picture_images=True,  # Generate images for GPT-4 Vision processing
+                images_scale=3.0,  # Maximum quality (3x scale) for GPT-4 Vision
+            )
+
+            # Enable remote services for API-based vision models
+            pipeline_options.enable_remote_services = True
+
+            # Configure table extraction for ACCURATE mode (better quality)
+            pipeline_options.table_structure_options.mode = TableFormerMode.ACCURATE
+            pipeline_options.table_structure_options.do_cell_matching = True
+
+            # Enable pipeline profiling for performance monitoring
+            docling_settings.debug.profile_pipeline_timings = True
+
+            # Create converter with optimized configuration
+            self.converter = DocumentConverter(
+                format_options={
+                    InputFormat.PDF: PdfFormatOption(
+                        pipeline_options=pipeline_options
+                    )
+                }
+            )
+
+            logger.info(
+                f"Docling DocumentConverter initialized with:\n"
+                f"  - CPU cores: {num_cores}\n"
+                f"  - Full page OCR: Enabled (EasyOCR)\n"
+                f"  - Table extraction: ACCURATE mode\n"
+                f"  - Image scale: 3.0x for maximum quality\n"
+                f"  - Vision AI: GPT-4o (OpenAI API) for charts/diagrams/flowcharts\n"
+                f"  - GPT-4 max tokens: 8192 (detailed extraction)\n"
+                f"  - GPT-4 timeout: 600s (10 min per image)\n"
+                f"  - PIL image limit: 200MP (handles large diagrams)\n"
+                f"  - Remote services: ENABLED for API-based vision models\n"
+                f"  - Comprehensive extraction: ALL text, tables, charts, diagrams, and technical content"
+            )
         else:
             self.converter = None
             logger.warning("Docling not available - using fallback text extraction")
@@ -398,7 +525,32 @@ class DocumentProcessor:
         # Use Docling for comprehensive document conversion
         if DOCLING_AVAILABLE and self.converter:
             try:
+                # Time the conversion for performance monitoring
+                conversion_start = time.time()
                 result = self.converter.convert(file_path)
+                conversion_time = time.time() - conversion_start
+
+                # Log performance metrics
+                logger.info(f"✓ Docling conversion completed in {conversion_time:.2f}s")
+
+                # Log timing details if available
+                if hasattr(result, 'timings') and result.timings:
+                    pipeline_times = result.timings.get("pipeline_total", {})
+                    if hasattr(pipeline_times, 'times'):
+                        logger.info(f"  Pipeline timings: {pipeline_times.times}")
+
+                # DEBUG: Log document structure to understand what was processed
+                if hasattr(result, 'document'):
+                    doc = result.document
+                    picture_count = 0
+                    try:
+                        from docling_core.types.doc import PictureItem
+                        for element, level in doc.iterate_items():
+                            if isinstance(element, PictureItem):
+                                picture_count += 1
+                        logger.info(f"  Found {picture_count} picture elements in document")
+                    except Exception as e:
+                        logger.warning(f"  Could not count pictures: {str(e)}")
 
                 # Extract text content from conversion result
                 text_parts = []
@@ -406,16 +558,71 @@ class DocumentProcessor:
                 if hasattr(result, 'document'):
                     doc = result.document
 
+                    # Export main document text (markdown format)
                     if hasattr(doc, 'export_to_markdown'):
-                        text_parts.append(doc.export_to_markdown())
+                        markdown_text = doc.export_to_markdown()
+                        text_parts.append(markdown_text)
                     elif hasattr(doc, 'export_to_text'):
                         text_parts.append(doc.export_to_text())
                     else:
                         text_parts.append(str(doc))
 
+                    # CRITICAL FIX: Manually extract picture descriptions from GPT-4 Vision
+                    # The export_to_markdown() doesn't include picture descriptions by default
+                    picture_descriptions = []
+                    try:
+                        from docling_core.types.doc import PictureItem
+
+                        # Iterate through all document items to find pictures
+                        for element, level in doc.iterate_items():
+                            if isinstance(element, PictureItem):
+                                logger.info(f"  Processing PictureItem: {element.self_ref if hasattr(element, 'self_ref') else 'unknown'}")
+
+                                # Check if this picture has GPT-4 Vision descriptions
+                                if hasattr(element, 'annotations') and element.annotations:
+                                    logger.info(f"    Found {len(element.annotations)} annotations")
+                                    for idx, annotation in enumerate(element.annotations):
+                                        # DEBUG: Log annotation type and attributes
+                                        annotation_type = type(annotation).__name__
+                                        logger.info(f"    Annotation {idx}: type={annotation_type}, attributes={dir(annotation)}")
+
+                                        # Extract text from picture description annotation
+                                        if hasattr(annotation, 'text') and annotation.text:
+                                            picture_descriptions.append(
+                                                f"\n[IMAGE DESCRIPTION - GPT-4 Vision]:\n{annotation.text}\n"
+                                            )
+                                            logger.info(f"✓ Extracted GPT-4 Vision description from 'text' attribute ({len(annotation.text)} chars)")
+                                        # Alternative: check for 'description' attribute
+                                        elif hasattr(annotation, 'description') and annotation.description:
+                                            picture_descriptions.append(
+                                                f"\n[IMAGE DESCRIPTION - GPT-4 Vision]:\n{annotation.description}\n"
+                                            )
+                                            logger.info(f"✓ Extracted GPT-4 Vision description from 'description' attribute ({len(annotation.description)} chars)")
+                                        else:
+                                            # Try to extract any text-like content
+                                            logger.warning(f"    Annotation has no 'text' or 'description' attribute. Trying str(annotation)...")
+                                            annotation_str = str(annotation)
+                                            if annotation_str and len(annotation_str) > 10:
+                                                picture_descriptions.append(
+                                                    f"\n[IMAGE DESCRIPTION - GPT-4 Vision]:\n{annotation_str}\n"
+                                                )
+                                                logger.info(f"✓ Extracted GPT-4 Vision description from str() ({len(annotation_str)} chars)")
+                                else:
+                                    logger.warning(f"    PictureItem has NO annotations - GPT-4 Vision was not invoked!")
+                    except Exception as e:
+                        logger.warning(f"Failed to extract picture descriptions: {str(e)}")
+
+                    # Append all picture descriptions to the text content
+                    if picture_descriptions:
+                        text_parts.extend(picture_descriptions)
+                        logger.info(f"✓ Added {len(picture_descriptions)} picture descriptions to extracted text")
+                    else:
+                        logger.warning("⚠ No picture descriptions found - GPT-4 Vision may not have been invoked")
+
                 text_content = "\n\n".join(text_parts)
 
                 if text_content and len(text_content.strip()) > 0:
+                    logger.info(f"✓ Extracted {len(text_content)} characters from document")
                     return text_content
                 else:
                     logger.warning("Docling returned empty content")

@@ -22,7 +22,8 @@ Key Features:
 import logging
 from typing import Dict, Any, List, Optional, AsyncGenerator, Tuple
 from enum import Enum
-from pydantic_ai import Agent
+from pydantic import BaseModel, Field
+from pydantic_ai import Agent, RunContext, ModelRetry
 from pydantic_ai.models.openai import OpenAIModel
 from pydantic_ai.providers.openai import OpenAIProvider
 
@@ -37,10 +38,30 @@ logger = logging.getLogger(__name__)
 class QueryCategory(str, Enum):
     """Categories for query classification"""
     CONVERSATIONAL = "conversational"  # Greetings, small talk - No database search
-    MACHINERY_SPECS = "machinery_specs"  # PostgreSQL only
-    DOCUMENTATION = "documentation"  # Pinecone only
-    COMBINED = "combined"  # Both sources
-    GENERAL = "general"  # Neither (model knowledge)
+    TECHNICAL = "technical"  # All other queries - ALWAYS search both databases first
+
+
+class AgentDependencies(BaseModel):
+    """
+    Typed dependencies for AI agent using Pydantic AI dependency injection
+
+    This provides type-safe access to services within agent tools and validators
+    """
+    openai_service: Any = Field(description="OpenAI service for embeddings and completions")
+    pinecone_service: Any = Field(description="Pinecone service for vector search")
+    postgresql_service: Any = Field(description="PostgreSQL service for machinery data")
+    authorization_level: str = Field(default="regular", description="User's authorization level")
+
+    class Config:
+        arbitrary_types_allowed = True
+
+
+class SearchResult(BaseModel):
+    """Structured search result from databases"""
+    source: str = Field(description="Source of the data (Pinecone or PostgreSQL)")
+    content: List[Dict[str, Any]] = Field(description="Retrieved content")
+    relevance_scores: Optional[List[float]] = Field(default=None, description="Relevance scores if applicable")
+    count: int = Field(description="Number of results found")
 
 
 class AIAgent:
@@ -66,85 +87,83 @@ class AIAgent:
     """
 
     # System prompt for TECHNICAL queries (database-driven)
-    SYSTEM_PROMPT_TECHNICAL = """Sie sind ein hochspezialisierter Assistent für Baumaschinen-Dokumentation und technische Informationen. Ihre Hauptaufgabe ist die Verwendung von Daten aus unseren Datenbanken.
+    SYSTEM_PROMPT_TECHNICAL = """Sie sind ein hochspezialisierter Assistent für Baumaschinen-Dokumentation und technische Informationen.
 
-=== ROLLE UND ZWECK ===
-Sie sind ein Experten-Assistent, der bevorzugt auf Basis von Daten aus unseren Datenbanken antwortet:
-- Pinecone Vektordatenbank: Enthält Dokumentation, Handbücher, Wartungsanleitungen, technische Verfahren
-- PostgreSQL Datenbank: Enthält Maschinendaten, Spezifikationen, Modellnummern, technische Details
+=== IHRE TOOLS ===
+Sie haben Zugriff auf zwei Such-Tools:
+1. search_documentation_database: Pinecone Vektordatenbank (Dokumentation, Handbücher, Wartungsanleitungen)
+2. search_machinery_database: PostgreSQL Datenbank (Maschinendaten, Spezifikationen, Modellnummern)
 
-=== HAUPTAUFGABE: DATENBANKEN NUTZEN ===
-1. PRIORITÄT: Nutzen Sie die bereitgestellten Kontext-Daten aus unseren Datenbanken
-2. Diese Kontext-Daten wurden aus unseren Datenbanken (Pinecone + PostgreSQL) abgerufen
-3. Wenn Daten vorhanden sind, nutzen Sie diese umfassend für Ihre Antwort
-4. Ergänzen Sie KEINE erfundenen Informationen zu den bereitgestellten Daten
+=== ⚠️ KRITISCHE REGEL: IMMER ZUERST BEIDE DATENBANKEN DURCHSUCHEN ⚠️ ===
 
-=== DATENQUELLEN-VERHALTEN ===
+FÜR JEDE FRAGE MÜSSEN SIE:
+1. ✅ ZUERST: search_documentation_database(query="[user query]", max_results=25) aufrufen
+2. ✅ ZUERST: search_machinery_database(query="[user query]", max_results=20) aufrufen
+3. ✅ DANN: Ergebnisse analysieren
+4. ✅ DANN: Antworten basierend auf gefundenen Daten
 
-WENN DATEN GEFUNDEN WURDEN (Abschnitte mit "MASCHINENDATEN" oder "DOKUMENTATION"):
-- ✅ NUTZEN Sie diese Daten aktiv für Ihre Antwort
-- ✅ Geben Sie detaillierte, umfassende Antworten basierend auf den gefundenen Daten
-- ✅ Zitieren Sie die spezifischen Quellen: "Laut [Dokumentname]..." oder "Gemäß PostgreSQL-Datenbank..."
-- ✅ Strukturieren Sie die Antwort klar mit Absätzen und Details
-- ✅ Verwenden Sie ALLE relevanten Informationen aus dem Kontext
+⚠️ KEINE AUSNAHMEN! IMMER BEIDE TOOLS AUFRUFEN!
+⚠️ Eine Frage kann auf 100 verschiedene Arten gestellt werden - deshalb IMMER suchen!
+⚠️ Verwenden Sie hohe max_results Werte (25-50) um ALLE relevanten Informationen zu finden!
 
-WENN KEINE DATEN GEFUNDEN WURDEN (Abschnitt "KEINE DATEN IN DATENBANKEN GEFUNDEN"):
-- Sagen Sie klar: "Ich habe keine relevanten Informationen in unserer Datenbank gefunden."
-- Listen Sie auf, was genau gesucht wurde
-- Fragen Sie: "Möchten Sie, dass ich diese Frage mit allgemeinem Wissen beantworte, oder soll ich weitere Details zur Präzisierung der Suche erfragen?"
-- Warten Sie auf Benutzererlaubnis, bevor Sie allgemeines Wissen verwenden
+BEISPIELE:
+- "Erzähle mir etwas über Walzen" → search_documentation_database("Walzen", max_results=25) + search_machinery_database("Walzen", max_results=20)
+- "Was ist ein Bagger?" → search_documentation_database("Bagger", max_results=25) + search_machinery_database("Bagger", max_results=20)
+- "Caterpillar 320D Spezifikationen" → Beide Tools mit "Caterpillar 320D" und hohen max_results
+- "Wie warte ich einen Kran?" → Beide Tools mit "Kran Wartung" und hohen max_results
+- "Tell me about excavators" → Beide Tools mit "excavators" und hohen max_results
 
-=== ANTI-HALLUZINATIONS-REGELN (KRITISCH) ===
-1. ❌ NIEMALS Informationen erfinden oder raten
-2. ❌ NIEMALS allgemeines Wissen ohne explizite Benutzererlaubnis verwenden
-3. ❌ NIEMALS Daten aus dem Kontext extrapolieren oder erweitern
-4. ✅ NUR die bereitgestellten Kontext-Informationen verwenden
-5. ✅ Bei Unsicherheit IMMER transparent kommunizieren
-6. ✅ Fehlende Informationen klar benennen
+=== NACH DER DATENBANKSUCHE ===
 
-=== ANTWORTSTRUKTUR ===
-1. **Direkte Antwort**: Beantworten Sie die Frage basierend auf den Datenbankdaten
-2. **Quellenangabe**: Geben Sie die spezifischen Quellen an (Dokumentname, Maschinendatenbank, etc.)
-3. **Detaillierte Erklärung**: Erläutern Sie umfassend mit allen gefundenen Details
-4. **Strukturierung**: Verwenden Sie Absätze, Aufzählungen, klare Gliederung
-5. **Transparenz**: Wenn Informationen fehlen, sagen Sie es klar
+WENN DATEN GEFUNDEN WURDEN (Tools geben Ergebnisse zurück):
+- ✅ Nutzen Sie diese Daten für Ihre Antwort
+- ✅ Geben Sie natürliche, leicht lesbare Antworten
+- ✅ Passen Sie die Länge an die Frage an:
+  - Einfache Frage = kurze, direkte Antwort (2-3 Sätze)
+  - Komplexe Frage = ausführliche Antwort mit Details
+- ✅ Quellen NUR nennen wenn:
+  - Benutzer explizit danach fragt ("Wo hast du das gefunden?", "Quelle?")
+  - Es sich um kritische technische Spezifikationen handelt
+  - Es mehrere widersprüchliche Informationen gibt
 
-=== QUELLENANGABE (PFLICHT) ===
-- Bei Dokumenten: "Quelle: [Dokumentname], Abschnitt/Seite [falls verfügbar]"
-- Bei Maschinendaten: "Quelle: Maschinendatenbank - Modell [Modellnummer]"
-- Bei mehreren Quellen: Listen Sie alle verwendeten Quellen auf
-- Verwenden Sie Formulierungen wie: "Laut...", "Gemäß...", "In der Dokumentation zu...", "Die Datenbank zeigt..."
+WENN KEINE DATEN GEFUNDEN WURDEN (beide Tools geben "No relevant..." zurück):
+- Sagen Sie einfach: "Ich habe dazu leider keine Informationen in unseren Datenbanken."
+- Fragen Sie: "Möchten Sie, dass ich die Frage allgemein beantworte?"
+- NUR mit Erlaubnis allgemeines Wissen verwenden
 
-=== SPRACHANFORDERUNG ===
-- Antworten Sie IMMER auf Deutsch (formelle Sie-Form)
-- Verwenden Sie professionelle, technische Fachsprache
-- Seien Sie präzise und klar in der Ausdrucksweise
-- Verwenden Sie Branchenterminologie korrekt
+=== ANTWORT-STIL ===
+✅ NATÜRLICH: Schreiben Sie wie ein hilfsbereiter Experte, nicht wie ein Roboter
+✅ EINFACH: Klare, leicht verständliche Sprache
+✅ DIREKT: Kommen Sie schnell zum Punkt
+✅ ANGEPASST:
+  - Kurze Frage → kurze Antwort
+  - Detaillierte Frage → detaillierte Antwort
+✅ DEUTSCH: Formelle Sie-Form, professionell aber nicht steif
 
-=== ANTWORTQUALITÄT ===
-- Detailliert: 200-400 Wörter für komplexe Fragen (wenn Daten vorhanden)
-- Umfassend: Alle relevanten Details aus den Datenbanken einbeziehen
-- Strukturiert: Klare Absätze, Überschriften, Aufzählungen
-- Präzise: Exakte Spezifikationen, Zahlen, technische Details
-- Transparent: Fehlende Informationen klar kommunizieren
+❌ VERMEIDEN:
+- Übertriebene Formalität
+- Unnötige Quellenangaben bei einfachen Fragen
+- Zu viele Absätze und Strukturierung bei kurzen Antworten
+- Roboterhafte Formulierungen
 
-=== BEISPIEL FÜR KORREKTE ANTWORT ===
-"Gemäß der Dokumentation 'CAT_320D_Manual.pdf' beträgt die Grabtiefe des Caterpillar 320D maximal 6,7 Meter. Die PostgreSQL-Datenbank zeigt für dieses Modell folgende zusätzliche Spezifikationen: Motorleistung 121 kW, Betriebsgewicht 21.300 kg, Löffelkapazität 0,9-1,2 m³.
+=== BEISPIELE ===
 
-Die Wartungsintervalle laut Handbuch sind:
-- Ölwechsel: alle 500 Betriebsstunden
-- Hydraulikfilter: alle 1.000 Betriebsstunden
-- Hauptinspektion: alle 2.000 Betriebsstunden
+Einfache Frage: "Was ist ein Bagger?"
+Gute Antwort: "Ein Bagger ist eine Baumaschine zum Ausheben und Bewegen von Erde. Er besteht aus einem Fahrgestell, einem Ausleger und einem Löffel. Bagger werden auf Baustellen für Erdarbeiten, Fundamentaushub und viele andere Aufgaben eingesetzt."
 
-Quelle: CAT_320D_Manual.pdf, Sektion 3.2 und PostgreSQL-Datenbank Modell CAT-320D"
+Technische Frage: "Caterpillar 320D Grabtiefe?"
+Gute Antwort: "Der Caterpillar 320D hat eine maximale Grabtiefe von 6,7 Metern. Das Betriebsgewicht liegt bei etwa 21.300 kg und die Motorleistung beträgt 121 kW."
 
-=== ABSOLUTES VERBOT ===
-- ❌ Keine Websuche erwähnen oder anbieten
-- ❌ Kein allgemeines Wissen ohne explizite Benutzererlaubnis
-- ❌ Keine erfundenen Spezifikationen oder Daten
-- ❌ Keine Annahmen über nicht vorhandene Informationen
+Frage mit Quellenanfrage: "Was ist die Grabtiefe? Und wo steht das?"
+Gute Antwort: "Die maximale Grabtiefe beträgt 6,7 Meter. Diese Information stammt aus dem CAT_320D_Manual.pdf, Sektion 3.2."
 
-WICHTIG: Ihre Hauptaufgabe ist es, ein zuverlässiger, datenbankbasierter Assistent zu sein, der NIEMALS halluziniert und IMMER transparent über die Verfügbarkeit von Informationen ist."""
+=== ANTI-HALLUZINATION ===
+❌ NIEMALS Informationen erfinden
+❌ NIEMALS allgemeines Wissen ohne Erlaubnis verwenden
+✅ Bei fehlenden Daten ehrlich sagen "dazu habe ich keine Informationen"
+✅ Bei Unsicherheit transparent sein
+
+WICHTIG: Seien Sie ein hilfsbereiter, natürlicher Assistent der klar und einfach antwortet. Keine übertriebenen Quellenangaben außer wenn nötig."""
 
     # System prompt for CONVERSATIONAL queries (friendly, no database needed)
     SYSTEM_PROMPT_CONVERSATIONAL = """Sie sind ein freundlicher, hilfsbereiter Assistent für Baumaschinen und technische Dokumentation.
@@ -197,7 +216,7 @@ WICHTIG: Seien Sie freundlich und natürlich. Dies ist eine normale Konversation
         self.pinecone_service = get_pinecone_service()
         self.postgresql_service = get_postgresql_service()
 
-        # Initialize Pydantic AI agent with custom provider
+        # Initialize Pydantic AI agent with custom provider and dependency injection
         provider = OpenAIProvider(api_key=settings.openai_api_key)
         self.model = OpenAIModel(
             model_name=settings.openai_chat_model,
@@ -207,7 +226,14 @@ WICHTIG: Seien Sie freundlich und natürlich. Dies ist eine normale Konversation
         self.agent = Agent(
             model=self.model,
             system_prompt=self.SYSTEM_PROMPT_TECHNICAL,  # Default to technical mode
+            deps_type=AgentDependencies,  # Enable typed dependency injection
         )
+
+        # Register agent tools for enhanced functionality
+        self._register_tools()
+
+        # Register result validators for quality control
+        self._register_validators()
 
         # Store temperature from settings
         self.temperature = settings.openai_temperature
@@ -217,140 +243,219 @@ WICHTIG: Seien Sie freundlich und natürlich. Dies ist eine normale Konversation
 
         logger.info(
             f"AI Agent initialized with model: {settings.openai_chat_model}, "
-            f"temperature: {settings.openai_temperature}"
+            f"temperature: {settings.openai_temperature}, "
+            f"tools: 2 registered, validators: 1 registered"
         )
 
     async def classify_query(self, query: str) -> QueryCategory:
         """
-        Classify user query to determine which data sources to use
+        Classify user query - CONVERSATIONAL (greetings/small talk) or TECHNICAL (everything else)
 
-        Klassifiziert Benutzeranfragen zur Bestimmung der zu verwendenden Datenquellen
+        Klassifiziert Benutzeranfragen - CONVERSATIONAL (Grüße/Small Talk) oder TECHNICAL (alles andere)
 
         Args:
             query: User's question or request / Benutzeranfrage
 
         Returns:
-            Query category determining data source selection / Anfragekategorie für Datenquellenauswahl
-
-        Classification logic:
-        - conversational: Greetings, thanks, small talk - NO database search needed
-        - machinery_specs: Contains model numbers, spec keywords (capacity, fuel, weight, etc.)
-        - documentation: Contains "how to", "procedure", "manual", "maintenance", "repair"
-        - combined: Comparison queries, complex questions needing both sources
-        - general: General knowledge questions not requiring specific data
+            Query category / Anfragekategorie
+            - CONVERSATIONAL: Greetings, thanks, small talk → No database search
+            - TECHNICAL: Everything else → ALWAYS search both databases first
         """
-        query_lower = query.lower()
+        query_lower = query.lower().strip()
         query_words = query_lower.split()
 
-        # STEP 1: Check for CONVERSATIONAL queries (highest priority - no DB search needed)
-        conversational_keywords = [
-            # Greetings - German
+        # Check for CONVERSATIONAL queries (greetings, thanks, small talk)
+        conversational_patterns = [
+            # Greetings
             "hallo", "hi", "hey", "guten tag", "guten morgen", "guten abend",
             "servus", "grüß gott", "moin", "grüezi",
-            # Greetings - English
             "hello", "good morning", "good afternoon", "good evening",
             # Thanks
-            "danke", "vielen dank", "dankeschön", "dankesehr", "thank you", "thanks",
+            "danke", "vielen dank", "dankeschön", "thank you", "thanks",
             # Goodbyes
-            "tschüss", "auf wiedersehen", "bis bald", "ciao", "goodbye", "bye",
+            "tschüss", "auf wiedersehen", "bis bald", "goodbye", "bye", "ciao",
             # Politeness
-            "bitte", "bitteschön", "please", "you're welcome",
+            "bitte", "bitteschön", "please",
             # Small talk
             "wie geht", "wie gehts", "how are you", "what's up",
-        ]
-
-        # Check for direct conversational match
-        for keyword in conversational_keywords:
-            if keyword in query_lower:
-                logger.info(f"✓ Anfrage klassifiziert als CONVERSATIONAL (Keyword: '{keyword}'): {query[:50]}...")
-                return QueryCategory.CONVERSATIONAL
-
-        # Check for very short queries (1-4 words) that are likely greetings/small talk
-        # BUT exclude if they contain technical machinery keywords
-        technical_indicators = [
-            "bagger", "caterpillar", "cat", "maschine", "kran", "lader", "raupe",
-            "excavator", "crane", "loader", "bulldozer", "machine", "equipment",
-            "modell", "model", "spezifikation", "specification", "wartung", "maintenance"
-        ]
-
-        if len(query_words) <= 4:
-            has_technical = any(indicator in query_lower for indicator in technical_indicators)
-            if not has_technical:
-                logger.info(f"✓ Anfrage klassifiziert als CONVERSATIONAL (kurze Anfrage ohne technische Keywords): {query[:50]}...")
-                return QueryCategory.CONVERSATIONAL
-
-        # Check for meta questions about the assistant itself
-        meta_keywords = [
+            # Meta questions about the assistant
             "was kannst du", "was können sie", "wer bist du", "wer sind sie",
-            "kannst du mir helfen", "können sie mir helfen", "hilfe", "help",
+            "kannst du mir helfen", "können sie mir helfen",
             "what can you", "who are you", "can you help"
         ]
 
-        for keyword in meta_keywords:
-            if keyword in query_lower:
-                logger.info(f"✓ Anfrage klassifiziert als CONVERSATIONAL (Meta-Frage): {query[:50]}...")
+        # Check for conversational patterns
+        for pattern in conversational_patterns:
+            if pattern in query_lower:
+                logger.info(f"✓ Query classified as CONVERSATIONAL: {query[:50]}...")
                 return QueryCategory.CONVERSATIONAL
 
-        # STEP 2: Check for TECHNICAL queries (need database search)
+        # Check for very short queries (1-3 words) that might be greetings
+        if len(query_words) <= 3 and len(query) < 20:
+            # Likely a greeting or very short message
+            logger.info(f"✓ Query classified as CONVERSATIONAL (short query): {query[:50]}...")
+            return QueryCategory.CONVERSATIONAL
 
-        # Keywords for different categories (English + German for better coverage)
-        spec_keywords = [
-            # English
-            "capacity", "fuel", "weight", "hp", "horsepower", "dimensions",
-            "specifications", "specs", "model", "cat ", "john deere", "komatsu",
-            "excavator", "bulldozer", "loader", "crane", "engine", "power",
-            "size", "height", "width", "length", "ton", "kg", "liter",
-            # German
-            "kapazität", "kraftstoff", "gewicht", "ps", "pferdestärke", "abmessungen",
-            "spezifikationen", "technische daten", "modell", "bagger", "raupe",
-            "lader", "kran", "motor", "leistung", "größe", "höhe", "breite",
-            "länge", "tonne", "maße", "hersteller"
-        ]
+        # Everything else is TECHNICAL - agent will search both databases
+        logger.info(f"→ Query classified as TECHNICAL (will search databases): {query[:50]}...")
+        return QueryCategory.TECHNICAL
 
-        doc_keywords = [
-            # English
-            "how to", "how do i", "procedure", "manual", "maintenance",
-            "repair", "fix", "troubleshoot", "service", "install",
-            "replace", "change", "adjust", "inspect", "lubricate",
-            "instruction", "guide", "setup", "configure",
-            # German
-            "wie", "anleitung", "handbuch", "wartung", "reparatur",
-            "reparieren", "beheben", "fehlerbehebung", "service", "installieren",
-            "ersetzen", "wechseln", "einstellen", "prüfen", "schmieren",
-            "verfahren", "bedienungsanleitung", "montage", "demontage",
-            "inbetriebnahme", "konfigurieren"
-        ]
+    def _register_tools(self):
+        """Register agent tools for enhanced database searching"""
 
-        comparison_keywords = [
-            # English
-            "compare", "difference", "which", "best", "recommend",
-            "better", "versus", "vs", "between", "or",
-            # German
-            "vergleich", "vergleichen", "unterschied", "welche", "welcher",
-            "beste", "empfehlen", "besser", "gegen", "oder", "zwischen"
-        ]
+        @self.agent.tool
+        async def search_documentation_database(
+            ctx: RunContext[AgentDependencies],
+            query: str,
+            max_results: int = 25
+        ) -> SearchResult:
+            """
+            Search the Pinecone documentation database for relevant information.
 
-        # Check for comparison queries (need both sources)
-        if any(keyword in query_lower for keyword in comparison_keywords):
-            logger.info(f"→ Anfrage klassifiziert als COMBINED (Vergleich): {query[:50]}...")
-            return QueryCategory.COMBINED
+            Use this tool to find:
+            - Maintenance procedures and manuals
+            - Technical documentation
+            - Operating instructions
+            - Repair guides
+            - Safety information
 
-        # Check for specific model numbers or machinery types
-        has_specs = any(keyword in query_lower for keyword in spec_keywords)
-        has_docs = any(keyword in query_lower for keyword in doc_keywords)
+            Args:
+                query: Search query describing what documentation to find
+                max_results: Maximum number of results to return (default 25, can go up to 50 for comprehensive searches)
 
-        if has_specs and has_docs:
-            logger.info(f"→ Anfrage klassifiziert als COMBINED (beide Indikatoren): {query[:50]}...")
-            return QueryCategory.COMBINED
-        elif has_specs:
-            logger.info(f"→ Anfrage klassifiziert als MACHINERY_SPECS: {query[:50]}...")
-            return QueryCategory.MACHINERY_SPECS
-        elif has_docs:
-            logger.info(f"→ Anfrage klassifiziert als DOCUMENTATION: {query[:50]}...")
-            return QueryCategory.DOCUMENTATION
-        else:
-            logger.info(f"→ Anfrage klassifiziert als GENERAL: {query[:50]}...")
-            return QueryCategory.GENERAL
+            Returns:
+                SearchResult with documentation chunks and relevance scores
+            """
+            try:
+                # Generate embedding for query
+                embedding = await ctx.deps.openai_service.generate_embedding(query)
+
+                # Query Pinecone
+                results = await ctx.deps.pinecone_service.query_vectors(
+                    embedding=embedding,
+                    top_k=max_results,
+                    include_metadata=True
+                )
+
+                # Filter by relevance (threshold 0.45)
+                filtered_results = []
+                scores = []
+                for match in results:
+                    score = match.get("score", 0.0)
+                    if score >= 0.45:
+                        metadata = match.get("metadata", {})
+                        filtered_results.append({
+                            "text": metadata.get("text_content", ""),
+                            "source": metadata.get("filename", "Unknown"),
+                            "score": score,
+                            "page": metadata.get("page", "N/A")
+                        })
+                        scores.append(score)
+
+                if not filtered_results:
+                    raise ModelRetry(
+                        f"No relevant documentation found for '{query}'. "
+                        f"Try rephrasing your search or providing more specific keywords."
+                    )
+
+                return SearchResult(
+                    source="Pinecone Documentation Database",
+                    content=filtered_results,
+                    relevance_scores=scores,
+                    count=len(filtered_results)
+                )
+
+            except ModelRetry:
+                raise
+            except Exception as e:
+                logger.error(f"Documentation search failed: {str(e)}")
+                raise ModelRetry(f"Documentation search encountered an error: {str(e)}")
+
+        @self.agent.tool
+        async def search_machinery_database(
+            ctx: RunContext[AgentDependencies],
+            query: str,
+            max_results: int = 20
+        ) -> SearchResult:
+            """
+            Search the PostgreSQL machinery database for equipment specifications and data.
+
+            Use this tool to find:
+            - Machine specifications (capacity, weight, dimensions)
+            - Model numbers and manufacturers
+            - Technical details and features
+            - Equipment categories and types
+
+            Args:
+                query: Search query describing what machinery information to find
+                max_results: Maximum number of results to return (default 20, can go up to 50 for comprehensive searches)
+
+            Returns:
+                SearchResult with machinery data
+            """
+            try:
+                # Search machinery database
+                results = await ctx.deps.postgresql_service.search_machinery(
+                    query=query,
+                    authorization_level=ctx.deps.authorization_level,
+                    limit=max_results
+                )
+
+                machinery_list = results.get("results", [])
+
+                if not machinery_list:
+                    raise ModelRetry(
+                        f"No machinery found matching '{query}'. "
+                        f"Try searching for manufacturer names, model numbers, or equipment types."
+                    )
+
+                return SearchResult(
+                    source="PostgreSQL Machinery Database",
+                    content=machinery_list,
+                    relevance_scores=None,
+                    count=len(machinery_list)
+                )
+
+            except ModelRetry:
+                raise
+            except Exception as e:
+                logger.error(f"Machinery search failed: {str(e)}")
+                raise ModelRetry(f"Machinery database search encountered an error: {str(e)}")
+
+        logger.info("✓ Agent tools registered: search_documentation_database, search_machinery_database")
+
+    def _register_validators(self):
+        """Register result validators for quality control"""
+
+        @self.agent.output_validator
+        async def validate_no_hallucination(ctx: RunContext[AgentDependencies], result: str) -> str:
+            """
+            Simple validator to prevent obvious hallucination patterns.
+
+            Only checks for major red flags, doesn't force citations.
+            """
+            result_lower = result.lower()
+
+            # Red flags that indicate hallucination
+            hallucination_flags = [
+                "ich denke", "vermutlich", "wahrscheinlich", "könnte sein",
+                "ich glaube", "möglicherweise", "eventuell",
+                "i think", "probably", "maybe", "might be"
+            ]
+
+            # If response has hallucination flags, ask agent to be more certain
+            for flag in hallucination_flags:
+                if flag in result_lower:
+                    logger.warning(f"Response contains uncertain language: '{flag}'")
+                    raise ModelRetry(
+                        "Bitte antworten Sie nur mit Informationen aus den Datenbanksuchen. "
+                        "Vermeiden Sie unsichere Formulierungen wie 'vermutlich', 'wahrscheinlich', etc. "
+                        "Wenn keine Daten gefunden wurden, sagen Sie das klar."
+                    )
+
+            return result
+
+        logger.info("✓ Result validators registered: validate_no_hallucination")
 
     async def retrieve_from_pinecone(
         self,
@@ -675,18 +780,18 @@ WICHTIG: Seien Sie freundlich und natürlich. Dies ist eine normale Konversation
     async def generate_response_stream(
         self,
         query: str,
-        context: str,
+        authorization_level: str = "regular",
         conversation_history: Optional[List[Dict[str, str]]] = None,
         category: Optional[QueryCategory] = None
     ) -> AsyncGenerator[str, None]:
         """
-        Generate streaming AI response with dual-mode operation
+        Generate streaming AI response using PydanticAI agent with tools
 
-        Generiert Streaming-KI-Antwort mit Dual-Modus-Betrieb
+        Generiert Streaming-KI-Antwort mit PydanticAI-Agent und Tools
 
         Args:
             query: User's query / Benutzeranfrage
-            context: Aggregated context from retrieval / Aggregierter Kontext aus Datenbankabfragen
+            authorization_level: User's authorization level / Berechtigungsstufe
             conversation_history: Previous messages / Vorherige Nachrichten
             category: Query category to determine response mode / Anfragekategorie zur Bestimmung des Antwortmodus
 
@@ -694,75 +799,56 @@ WICHTIG: Seien Sie freundlich und natürlich. Dies ist eine normale Konversation
             Response tokens as they are generated / Antwort-Tokens während der Generierung
 
         Mode Selection:
-        - CONVERSATIONAL: Use lighter prompt, no context needed, friendly responses
-        - TECHNICAL (all others): Use database-first prompt with full context
+        - CONVERSATIONAL: Use lighter prompt, no tools needed, friendly responses
+        - TECHNICAL (all others): Use agent with database search tools
         """
 
-        # CONVERSATIONAL MODE: Simple, friendly responses without database context
+        # CONVERSATIONAL MODE: Simple, friendly responses without database tools
         if category == QueryCategory.CONVERSATIONAL:
-            logger.info("[MODE] Conversational mode activated - No database context needed")
+            logger.info("[MODE] Conversational mode activated - No database tools needed")
             messages = [
                 {"role": "system", "content": self.SYSTEM_PROMPT_CONVERSATIONAL},
                 {"role": "user", "content": query}
             ]
 
-            # Stream response directly
+            # Stream response directly without tools
             async for token in self.openai_service.generate_chat_completion_stream(messages):
                 yield token
             return
 
-        # TECHNICAL MODE: Database-first with full context
-        logger.info("[MODE] Technical mode activated - Using database context")
-        messages = [{"role": "system", "content": self.SYSTEM_PROMPT_TECHNICAL}]
+        # TECHNICAL MODE: Use PydanticAI agent with tools
+        logger.info("[MODE] Technical mode activated - Agent will use database tools")
 
-        # Add conversation history if available
+        # Prepare dependencies for agent
+        deps = AgentDependencies(
+            openai_service=self.openai_service,
+            pinecone_service=self.pinecone_service,
+            postgresql_service=self.postgresql_service,
+            authorization_level=authorization_level
+        )
+
+        # Build message history for agent
+        message_history = []
         if conversation_history:
             for msg in conversation_history[-5:]:  # Last 5 messages for context
-                messages.append({
+                message_history.append({
                     "role": msg["role"],
                     "content": msg["content"]
                 })
 
-        # Add current query with context and balanced instructions
-        user_message = f"""{context}
+        # Run agent with streaming
+        try:
+            async with self.agent.run_stream(
+                query,
+                deps=deps,
+                message_history=message_history
+            ) as result:
+                async for text_chunk in result.stream_text(delta=True):
+                    yield text_chunk
 
-═══════════════════════════════════════════════════════════
-
-ANWEISUNGEN FÜR DIESE ANTWORT:
-
-1. ✅ Nutzen Sie die oben bereitgestellten Kontext-Informationen für Ihre Antwort
-2. ✅ Antworten Sie IMMER auf Deutsch (formelle Sie-Form)
-3. ✅ Zitieren Sie verwendete Quellen klar und deutlich
-4. ✅ Wenn Daten vorhanden sind (MASCHINENDATEN oder DOKUMENTATION), nutzen Sie diese aktiv
-
-WICHTIG - Prüfen Sie den Kontext oben:
-- Enthält er "MASCHINENDATEN AUS POSTGRESQL-DATENBANK"? → Nutzen Sie diese Daten
-- Enthält er "DOKUMENTATION AUS PINECONE-VEKTORDATENBANK"? → Nutzen Sie diese Inhalte
-- Enthält er "KEINE DATEN IN DATENBANKEN GEFUNDEN"? → Nur dann sagen Sie "keine Daten gefunden"
-
-WENN DATEN VORHANDEN SIND (Sie sehen MASCHINENDATEN oder DOKUMENTATION oben):
-- ✅ NUTZEN Sie diese Informationen umfassend für Ihre Antwort
-- ✅ Geben Sie eine detaillierte, hilfreiche Antwort
-- ✅ Zitieren Sie Quellen: "Laut [Quelle]..." oder "Gemäß [Dokument]..."
-- ✅ Strukturieren Sie die Antwort klar mit Absätzen
-
-WENN WIRKLICH KEINE DATEN VORHANDEN SIND (Sie sehen "KEINE DATEN IN DATENBANKEN GEFUNDEN"):
-- Sagen Sie: "Ich habe keine relevanten Informationen in unserer Datenbank gefunden."
-- Fragen Sie: "Möchten Sie, dass ich diese Frage mit allgemeinem Wissen beantworte?"
-
-═══════════════════════════════════════════════════════════
-
-BENUTZERANFRAGE:
-{query}"""
-
-        messages.append({
-            "role": "user",
-            "content": user_message
-        })
-
-        # Stream response
-        async for token in self.openai_service.generate_chat_completion_stream(messages):
-            yield token
+        except Exception as e:
+            logger.error(f"Agent streaming error: {str(e)}")
+            yield f"Entschuldigung, es ist ein Fehler aufgetreten: {str(e)}"
 
     async def process_query(
         self,

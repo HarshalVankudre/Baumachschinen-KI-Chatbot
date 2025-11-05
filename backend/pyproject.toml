@@ -55,6 +55,11 @@ dependencies = [
     "python-pptx",
     "Pillow",
 
+    # Docling OCR and ML dependencies
+    "easyocr",
+    "torch",
+    "torchvision",
+
     # Utilities
     "python-dateutil",
 ]
@@ -136,6 +141,9 @@ module = [
     "pymongo.*",
     "pinecone.*",
     "docling.*",
+    "easyocr.*",
+    "torch.*",
+    "torchvision.*",
 ]
 ignore_missing_imports = true
 

@@ -18,9 +18,7 @@ export default function ChatPage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingMessage, setStreamingMessage] = useState('');
-  const [isAutoCreating, setIsAutoCreating] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const hasAutoCreatedRef = useRef(false); // Track if we've auto-created in this session
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -61,29 +59,6 @@ export default function ChatPage() {
     }
   }, [conversations, activeConversationId, setActiveConversation]);
 
-  // Auto-create conversation ONCE per session if none exist or all have messages
-  useEffect(() => {
-    // Skip if already loading, creating, or already auto-created in this session
-    if (conversationsLoading || createConversationMutation.isPending || hasAutoCreatedRef.current) {
-      return;
-    }
-
-    // Determine if we should auto-create:
-    // 1. User has NO conversations at all, OR
-    // 2. ALL existing conversations have messages (message_count > 0)
-    const shouldAutoCreate =
-      conversations.length === 0 ||
-      conversations.every((conv) => conv.message_count > 0);
-
-    // Auto-create exactly ONE conversation per session
-    if (shouldAutoCreate) {
-      hasAutoCreatedRef.current = true; // Mark that we've auto-created this session
-      setIsAutoCreating(true);
-      createConversationMutation.mutate();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationsLoading, conversations]);
-
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -95,30 +70,17 @@ export default function ChatPage() {
       refetchConversations();
       setActiveConversation(newConv.conversation_id);
       setMessages([]);
-
-      // Only show toast if this is a manual creation (not auto-created)
-      if (!isAutoCreating) {
-        toast({
-          title: 'Erfolgreich',
-          description: 'Neue Konversation erstellt',
-        });
-      }
-
-      // Reset auto-creating flag
-      setIsAutoCreating(false);
+      toast({
+        title: 'Erfolgreich',
+        description: 'Neue Konversation erstellt',
+      });
     },
     onError: () => {
-      // Only show error toast if this is a manual creation
-      if (!isAutoCreating) {
-        toast({
-          title: 'Fehler',
-          description: 'Konversation konnte nicht erstellt werden',
-          variant: 'destructive',
-        });
-      }
-
-      // Reset auto-creating flag
-      setIsAutoCreating(false);
+      toast({
+        title: 'Fehler',
+        description: 'Konversation konnte nicht erstellt werden',
+        variant: 'destructive',
+      });
     },
   });
 

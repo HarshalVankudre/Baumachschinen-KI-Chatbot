@@ -501,53 +501,18 @@ async def send_message_streaming(
             ai_agent = get_ai_agent()
             category = await ai_agent.classify_query(message_data.message)
 
-            # Step 5: Handle based on category
-            context = ""
-            sources = []
-
-            # CONVERSATIONAL queries: Skip database search entirely
-            if category == "conversational":
-                logger.info(f"[CONVERSATIONAL] Skipping database search for conversational query: {message_data.message[:50]}...")
-                # No database retrieval needed for greetings/small talk
-                # context remains empty, sources remains empty
-
-            # TECHNICAL queries: Search databases
-            else:
-                logger.info(f"[TECHNICAL] Performing database search for category: {category}")
-                pinecone_results = None
-                postgresql_results = None
-
-                if category in ["documentation", "combined"]:
-                    pinecone_results = await ai_agent.retrieve_from_pinecone(message_data.message)
-
-                if category in ["machinery_specs", "combined"]:
-                    postgresql_results = await ai_agent.retrieve_from_postgresql(
-                        message_data.message,
-                        user.authorization_level
-                    )
-
-                # Step 6: Aggregate context
-                context, sources = await ai_agent.aggregate_context(
-                    query=message_data.message,
-                    pinecone_results=pinecone_results,
-                    postgresql_results=postgresql_results
-                )
-
-            # Step 7: Stream AI response (pass category for mode selection)
+            # Step 5: Stream AI response with agent tools
+            # Agent will automatically use database search tools when needed
             async for token in ai_agent.generate_response_stream(
                 query=message_data.message,
-                context=context,
+                authorization_level=user.authorization_level,
                 conversation_history=conversation_history,
                 category=category  # Pass category to enable conversational mode
             ):
                 full_response += token
                 yield json.dumps({"type": "token", "content": token})
 
-            # Step 8: Send source citations
-            if sources:
-                yield json.dumps({"type": "source", "sources": sources})
-
-            # Step 9: Calculate response time and token count
+            # Step 6: Calculate response time and token count
             response_time_ms = int((time.time() - start_time) * 1000)
 
             # Count tokens (different for conversational vs technical)
@@ -560,19 +525,19 @@ async def send_message_streaming(
             else:
                 messages_for_count = [
                     {"role": "system", "content": ai_agent.SYSTEM_PROMPT_TECHNICAL},
-                    {"role": "user", "content": f"{context}\n\n{message_data.message}"},
+                    {"role": "user", "content": message_data.message},
                     {"role": "assistant", "content": full_response}
                 ]
             token_count = ai_agent.openai_service.count_tokens_messages(messages_for_count)
 
-            # Step 10: Save AI response to conversation
+            # Step 7: Save AI response to conversation
             ai_msg = MessageModel(
                 message_id=generate_token(),
                 role="assistant",
                 content=full_response,
                 timestamp=datetime.now(UTC),
                 metadata={
-                    "sources": sources,
+                    "sources": [],  # Sources now embedded in response text
                     "token_count": token_count,
                     "response_time_ms": response_time_ms,
                     "category": category,
@@ -594,8 +559,8 @@ async def send_message_streaming(
                 f"(tokens: {token_count}, time: {response_time_ms}ms)"
             )
 
-            # Step 11: Send completion event
-            yield json.dumps({"type": "complete", "message_id": ai_msg.message_id, "token_count": token_count, "response_time_ms": response_time_ms, "sources": sources})
+            # Step 8: Send completion event
+            yield json.dumps({"type": "complete", "message_id": ai_msg.message_id, "token_count": token_count, "response_time_ms": response_time_ms, "sources": []})
 
             # Log high token usage
             if token_count > 3000:

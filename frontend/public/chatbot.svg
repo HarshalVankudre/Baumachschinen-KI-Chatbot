@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Robot head background -->
+  <rect x="12" y="16" width="40" height="36" rx="6" fill="#3b82f6"/>
+
+  <!-- Antenna -->
+  <circle cx="32" cy="12" r="3" fill="#60a5fa"/>
+  <line x1="32" y1="12" x2="32" y2="16" stroke="#60a5fa" stroke-width="2" stroke-linecap="round"/>
+
+  <!-- Eyes -->
+  <circle cx="24" cy="28" r="4" fill="#ffffff"/>
+  <circle cx="40" cy="28" r="4" fill="#ffffff"/>
+  <circle cx="24" cy="28" r="2" fill="#1e40af"/>
+  <circle cx="40" cy="28" r="2" fill="#1e40af"/>
+
+  <!-- Smile/Chat indicator -->
+  <path d="M 22 38 Q 32 44 42 38" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+
+  <!-- Chat bubble accent -->
+  <circle cx="48" cy="20" r="6" fill="#10b981" opacity="0.9"/>
+  <path d="M 46 20 L 48 22 L 52 18" stroke="#ffffff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+
+  <!-- Base/neck -->
+  <rect x="28" y="52" width="8" height="4" rx="1" fill="#3b82f6"/>
+</svg>
