@@ -2,6 +2,7 @@
 Main FastAPI application for Building Machinery AI Chatbot.
 """
 import logging
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -42,12 +43,28 @@ async def lifespan(app: FastAPI):
     # Recover orphaned document processing jobs (from server restart/crash)
     await recover_orphaned_processes()
 
+    # Start the queue processor
+    from app.services.upload_queue_service import start_queue_processor
+    from app.core.database import get_database
+    processor_task = await start_queue_processor(get_database())
+    logger.info("Queue processor started")
+
     # TODO: Initialize other services (Pinecone, OpenAI clients) if needed
 
     yield
 
     # Shutdown
     logger.info("Shutting down application")
+
+    # Cancel queue processor
+    if processor_task and not processor_task.done():
+        processor_task.cancel()
+        try:
+            await processor_task
+        except asyncio.CancelledError:
+            pass
+        logger.info("Queue processor stopped")
+
     await close_mongo_connection()
     logger.info("MongoDB connection closed")
 

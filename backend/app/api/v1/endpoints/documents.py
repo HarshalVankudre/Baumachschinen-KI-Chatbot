@@ -16,7 +16,7 @@ import asyncio
 import time
 from datetime import datetime, UTC
 from typing import Optional, List
-from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status, BackgroundTasks
+from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException, status
 from fastapi.responses import JSONResponse
 from sse_starlette.sse import EventSourceResponse
 
@@ -33,6 +33,7 @@ from app.schemas.document import (
 from app.services.document_processor import get_document_processor
 from app.services.pinecone_service import get_pinecone_service
 from app.services.document_events import get_document_events_manager
+from app.services.upload_queue_service import get_queue_service
 from app.config import get_settings
 from app.utils.query_monitor import QueryPerformanceMonitor, with_timeout
 
@@ -63,7 +64,6 @@ def validate_file_extension(filename: str) -> bool:
     description="Upload a document for OCR processing and vector storage (superuser/admin only)"
 )
 async def upload_document(
-    background_tasks: BackgroundTasks,
     file: UploadFile = File(..., description="Document file to upload"),
     category: str = Form(..., description="Document category"),
     user: UserModel = Depends(require_superuser)
@@ -109,42 +109,32 @@ async def upload_document(
             f"by user {user.username}"
         )
 
-        # Create document metadata in MongoDB
+        # Don't create document metadata yet - it will be created when queue processor
+        # picks it up for processing. This avoids showing documents twice.
         db = get_database()
-        document_metadata = DocumentMetadataModel(
+
+        # Add to processing queue
+        queue_service = get_queue_service(db)
+        queue_item = await queue_service.add_to_queue(
             document_id=document_id,
             filename=file.filename,
             category=category,
+            file_path=temp_filepath,
+            file_size_bytes=file_size,
             uploader_id=user.user_id,
             uploader_name=user.username,
-            upload_date=datetime.now(UTC),
-            file_size_bytes=file_size,
-            file_extension=file_ext,
-            processing_status="uploading",
-            chunk_count=None,
-            error_message=None,
-            deleted=False
         )
 
-        await db.document_metadata.insert_one(document_metadata.model_dump())
-
-        logger.info(f"Created document metadata for {document_id}")
-
-        # Queue background processing task
-        processor = get_document_processor()
-        background_tasks.add_task(
-            processor.process_document,
-            document_id=document_id,
-            file_path=temp_filepath,
-            category=category,
-            uploader_name=user.username
+        logger.info(
+            f"Added document {document_id} to queue at position {queue_item.position}"
         )
 
         return {
             "document_id": document_id,
             "filename": file.filename,
-            "status": "uploading",
-            "message": "Document uploaded successfully. Processing in background."
+            "status": "queued",
+            "queue_position": queue_item.position,
+            "message": f"Document uploaded and queued at position {queue_item.position}. Processing will start automatically."
         }
 
     except HTTPException:

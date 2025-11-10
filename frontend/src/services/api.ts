@@ -2,7 +2,9 @@ import axios, { AxiosError } from 'axios';
 import type { AxiosInstance } from 'axios';
 import { useAuthStore } from '@/store/authStore';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
+console.log('[API] Initializing with base URL:', API_BASE_URL);
 
 // Create axios instance
 const apiClient: AxiosInstance = axios.create({
@@ -19,10 +21,19 @@ apiClient.interceptors.request.use(
   (config) => {
     if (import.meta.env.DEV) {
       console.log(`[API] ${config.method?.toUpperCase()} ${config.url}`);
+      if (config.url?.includes('upload')) {
+        console.log('[API] Upload request details:', {
+          url: config.url,
+          baseURL: config.baseURL,
+          fullURL: `${config.baseURL}${config.url}`,
+          headers: config.headers,
+        });
+      }
     }
     return config;
   },
   (error) => {
+    console.error('[API] Request interceptor error:', error);
     return Promise.reject(error);
   }
 );

@@ -77,28 +77,44 @@ export const documentService = {
     category: string,
     onProgress?: (progress: number) => void
   ): Promise<Document> {
+    console.log('[DocumentService] uploadDocument called:', { fileName: file.name, category, fileSize: file.size });
+
     const formData = new FormData();
     formData.append('file', file);
     formData.append('category', category);
 
-    const response = await apiClient.post('/api/documents/upload', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      timeout: 120000, // 2 minutes for file upload
-      onUploadProgress: (progressEvent) => {
-        if (progressEvent.total && onProgress) {
-          const progress = Math.round(
-            (progressEvent.loaded * 100) / progressEvent.total
-          );
-          onProgress(progress);
-        }
-      },
-    });
-    return response.data;
+    console.log('[DocumentService] Sending POST to /api/documents/upload');
+
+    try {
+      const response = await apiClient.post('/api/documents/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+        timeout: 120000, // 2 minutes for file upload
+        onUploadProgress: (progressEvent) => {
+          if (progressEvent.total && onProgress) {
+            const progress = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            console.log('[DocumentService] Upload progress:', progress, '%');
+            onProgress(progress);
+          }
+        },
+      });
+
+      console.log('[DocumentService] Upload successful, response:', response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error('[DocumentService] Upload failed:', error);
+      console.error('[DocumentService] Error response:', error.response?.data);
+      console.error('[DocumentService] Error status:', error.response?.status);
+      throw error;
+    }
   },
 
   async deleteDocument(id: string): Promise<void> {
-    await apiClient.delete(`/api/documents/${id}`);
+    await apiClient.delete(`/api/documents/${id}`, {
+      params: { hard_delete: true }
+    });
   },
 };

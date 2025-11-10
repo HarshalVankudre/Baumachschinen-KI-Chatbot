@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Upload, FileText, Trash2, X, CheckCircle, AlertCircle } from 'lucide-react';
+import { Upload, FileText, Trash2, X, CheckCircle, AlertCircle, Clock, Loader2 } from 'lucide-react';
+import { useServerQueue } from '@/hooks/useServerQueue';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -23,18 +24,27 @@ import { translateCategory } from '@/utils/translations';
 const ALLOWED_EXTENSIONS = ['.pdf', '.docx', '.pptx', '.xlsx', '.xls', '.ppt', '.jpg', '.jpeg', '.png', '.gif'];
 
 export function DocumentUploadTab() {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [category, setCategory] = useState<string>('');
-  const [uploadProgress, setUploadProgress] = useState<number>(0);
-  const [isUploading, setIsUploading] = useState(false);
   const [dragActive, setDragActive] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
 
-  // Fetch documents
+  // Server-side queue management
+  const serverQueue = useServerQueue();
+
+  // Fetch documents with auto-refresh when there are queue items or processing activity
   const { data: documentsData, isLoading } = useQuery({
     queryKey: ['documents'],
     queryFn: () => documentService.getDocuments(),
+    refetchInterval: () => {
+      // Refresh every 2 seconds if there are pending items or processing stats
+      const hasQueueItems = serverQueue.queue.length > 0;
+      const hasProcessingActivity = serverQueue.stats.processing > 0;
+      return hasQueueItems || hasProcessingActivity ? 2000 : false;
+    },
+    refetchIntervalInBackground: true,
   });
 
   // Store active SSE connections to prevent duplicates and ensure cleanup
@@ -50,7 +60,7 @@ export function DocumentUploadTab() {
 
     // EventSource automatically includes cookies for authentication
     const eventSource = new EventSource(
-      `http://localhost:8000/api/documents/stream/${documentId}`,
+      `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/documents/stream/${documentId}`,
       { withCredentials: true }
     );
 
@@ -139,6 +149,7 @@ export function DocumentUploadTab() {
 
       if (processingDocs.length > 0) {
         console.log(`Found ${processingDocs.length} in-progress documents, auto-reconnecting...`);
+
         processingDocs.forEach((doc) => {
           console.log(`Auto-reconnecting to document: ${doc.document_id} (${doc.processing_status})`);
           connectToDocumentStream(doc.document_id);
@@ -146,6 +157,10 @@ export function DocumentUploadTab() {
       }
     }
   }, [documentsData?.items, connectToDocumentStream]);
+
+  // Note: Processing documents are no longer in the queue
+  // They are removed from queue when processing starts and tracked in documents list
+  // SSE reconnection is handled by the useEffect above that watches documentsData
 
   // Cleanup all SSE connections on component unmount
   useEffect(() => {
@@ -159,73 +174,6 @@ export function DocumentUploadTab() {
     };
   }, []);
 
-  // Upload mutation
-  const uploadMutation = useMutation({
-    mutationFn: async () => {
-      if (!selectedFile || !category) {
-        throw new Error('Bitte wählen Sie eine Datei und Kategorie aus');
-      }
-      return documentService.uploadDocument(selectedFile, category, setUploadProgress);
-    },
-    onSuccess: async (response: any) => {
-      toast.success('Dokument erfolgreich hochgeladen', {
-        description: 'Das Dokument wird im Hintergrund verarbeitet.',
-      });
-
-      const documentId = response.document_id;
-
-      // Optimistic update: add document to cache immediately
-      if (documentId && selectedFile) {
-        queryClient.setQueryData(['documents'], (oldData: any) => {
-          if (!oldData) return oldData;
-
-          const newDocument = {
-            document_id: documentId,
-            filename: response.filename || selectedFile.name,
-            category: category,
-            upload_date: new Date().toISOString(),
-            uploader_name: response.uploader_name || '-',
-            uploader_id: response.uploader_id || '',
-            file_size_bytes: selectedFile.size,
-            processing_status: 'uploading' as const,
-            chunk_count: null,
-            error_message: null,
-          };
-
-          return {
-            ...oldData,
-            items: [newDocument, ...(oldData.items || [])],
-            total: (oldData.total || 0) + 1,
-          };
-        });
-      }
-
-      // Wait a bit for backend to commit to database, then refetch
-      await new Promise(resolve => setTimeout(resolve, 300));
-      await queryClient.refetchQueries({ queryKey: ['documents'] });
-
-      // Connect to SSE for real-time processing updates
-      if (documentId) {
-        connectToDocumentStream(documentId);
-      }
-
-      // Reset form
-      setSelectedFile(null);
-      setCategory('');
-      setUploadProgress(0);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    },
-    onError: (error: any) => {
-      toast.error('Upload fehlgeschlagen', {
-        description: error.response?.data?.detail || 'Fehler beim Hochladen des Dokuments',
-      });
-    },
-    onSettled: () => {
-      setIsUploading(false);
-    },
-  });
 
   // Delete mutation
   const deleteMutation = useMutation({
@@ -242,16 +190,29 @@ export function DocumentUploadTab() {
   });
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-      if (!ALLOWED_EXTENSIONS.includes(ext)) {
-        toast.error('Ungültiger Dateityp', {
-          description: `Erlaubte Typen: ${ALLOWED_EXTENSIONS.join(', ')}`,
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      const validFiles: File[] = [];
+      const invalidFiles: string[] = [];
+
+      files.forEach((file) => {
+        const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+        if (ALLOWED_EXTENSIONS.includes(ext)) {
+          validFiles.push(file);
+        } else {
+          invalidFiles.push(file.name);
+        }
+      });
+
+      if (invalidFiles.length > 0) {
+        toast.error('Ungültige Dateitypen übersprungen', {
+          description: `${invalidFiles.length} Datei(en) mit ungültigem Typ: ${invalidFiles.slice(0, 3).join(', ')}${invalidFiles.length > 3 ? '...' : ''}`,
         });
-        return;
       }
-      setSelectedFile(file);
+
+      if (validFiles.length > 0) {
+        setSelectedFiles((prev) => [...prev, ...validFiles]);
+      }
     }
   };
 
@@ -270,28 +231,81 @@ export function DocumentUploadTab() {
     e.stopPropagation();
     setDragActive(false);
 
-    const file = e.dataTransfer.files?.[0];
-    if (file) {
-      const ext = '.' + file.name.split('.').pop()?.toLowerCase();
-      if (!ALLOWED_EXTENSIONS.includes(ext)) {
-        toast.error('Ungültiger Dateityp', {
-          description: `Erlaubte Typen: ${ALLOWED_EXTENSIONS.join(', ')}`,
+    const files = Array.from(e.dataTransfer.files || []);
+    if (files.length > 0) {
+      const validFiles: File[] = [];
+      const invalidFiles: string[] = [];
+
+      files.forEach((file) => {
+        const ext = '.' + file.name.split('.').pop()?.toLowerCase();
+        if (ALLOWED_EXTENSIONS.includes(ext)) {
+          validFiles.push(file);
+        } else {
+          invalidFiles.push(file.name);
+        }
+      });
+
+      if (invalidFiles.length > 0) {
+        toast.error('Ungültige Dateitypen übersprungen', {
+          description: `${invalidFiles.length} Datei(en) mit ungültigem Typ: ${invalidFiles.slice(0, 3).join(', ')}${invalidFiles.length > 3 ? '...' : ''}`,
         });
-        return;
       }
-      setSelectedFile(file);
+
+      if (validFiles.length > 0) {
+        setSelectedFiles((prev) => [...prev, ...validFiles]);
+      }
     }
   };
 
   const handleUpload = async () => {
-    if (!selectedFile || !category) {
+    if (selectedFiles.length === 0 || !category) {
       toast.error('Fehlende Informationen', {
-        description: 'Bitte wählen Sie eine Datei und Kategorie aus',
+        description: 'Bitte wählen Sie mindestens eine Datei und eine Kategorie aus',
       });
       return;
     }
+
     setIsUploading(true);
-    uploadMutation.mutate();
+
+    // Upload each file directly - backend adds to queue
+    let successCount = 0;
+    let failCount = 0;
+
+    for (const file of selectedFiles) {
+      try {
+        const result = await documentService.uploadDocument(file, category);
+        console.log(`[Upload] File added to queue: ${file.name}`, result);
+        successCount++;
+      } catch (error: any) {
+        console.error(`[Upload] Failed to upload ${file.name}:`, error);
+        toast.error(`Upload fehlgeschlagen: ${file.name}`, {
+          description: error.response?.data?.detail || 'Fehler beim Hochladen',
+        });
+        failCount++;
+      }
+    }
+
+    setIsUploading(false);
+
+    // Show summary toast
+    if (successCount > 0) {
+      toast.success('Dateien zur Warteschlange hinzugefügt', {
+        description: `${successCount} Datei(en) werden verarbeitet${failCount > 0 ? `, ${failCount} fehlgeschlagen` : ''}`,
+      });
+    }
+
+    // Refetch documents list to show newly uploaded items
+    queryClient.invalidateQueries({ queryKey: ['documents'] });
+
+    // Clear selected files
+    setSelectedFiles([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveFile = (index: number) => {
+    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleDelete = (documentId: string) => {
@@ -382,6 +396,36 @@ export function DocumentUploadTab() {
     },
   ];
 
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle className="w-4 h-4 text-green-500" />;
+      case 'failed':
+        return <AlertCircle className="w-4 h-4 text-destructive" />;
+      case 'processing':
+        return <Loader2 className="w-4 h-4 text-primary animate-spin" />;
+      case 'pending':
+        return <Clock className="w-4 h-4 text-muted-foreground" />;
+      default:
+        return null;
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'pending':
+        return 'Wartend';
+      case 'processing':
+        return 'Wird verarbeitet';
+      case 'completed':
+        return 'Abgeschlossen';
+      case 'failed':
+        return 'Fehlgeschlagen';
+      default:
+        return status;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Upload Section */}
@@ -407,10 +451,12 @@ export function DocumentUploadTab() {
           >
             <Upload className="w-12 h-12 mx-auto mb-4 text-muted-foreground" />
             <p className="text-lg font-medium mb-2">
-              {selectedFile ? selectedFile.name : 'Datei hierher ziehen und ablegen'}
+              {selectedFiles.length > 0
+                ? `${selectedFiles.length} Datei(en) ausgewählt`
+                : 'Dateien hierher ziehen und ablegen'}
             </p>
             <p className="text-sm text-muted-foreground mb-4">
-              oder klicken zum Durchsuchen
+              oder klicken zum Durchsuchen (mehrere Dateien möglich)
             </p>
             <Input
               ref={fileInputRef}
@@ -419,30 +465,44 @@ export function DocumentUploadTab() {
               accept={ALLOWED_EXTENSIONS.join(',')}
               className="hidden"
               id="file-upload"
+              multiple
             />
             <Button
               variant="outline"
               onClick={() => fileInputRef.current?.click()}
               disabled={isUploading}
             >
-              Datei auswählen
+              Dateien auswählen
             </Button>
-            {selectedFile && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="ml-2"
-                onClick={() => {
-                  setSelectedFile(null);
-                  if (fileInputRef.current) {
-                    fileInputRef.current.value = '';
-                  }
-                }}
-              >
-                <X className="w-4 h-4" />
-              </Button>
-            )}
           </div>
+
+          {/* Selected Files List */}
+          {selectedFiles.length > 0 && (
+            <div className="space-y-2">
+              <Label>Ausgewählte Dateien ({selectedFiles.length})</Label>
+              <div className="border rounded-lg divide-y max-h-40 overflow-y-auto">
+                {selectedFiles.map((file, index) => (
+                  <div key={index} className="flex items-center justify-between p-2 hover:bg-muted/50">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <FileText className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <span className="text-sm truncate">{file.name}</span>
+                      <span className="text-xs text-muted-foreground flex-shrink-0">
+                        ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                      </span>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveFile(index)}
+                      disabled={isUploading}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Category Selection */}
           <div className="space-y-2">
@@ -461,25 +521,16 @@ export function DocumentUploadTab() {
             </Select>
           </div>
 
-          {/* Upload Progress */}
-          {isUploading && (
-            <div className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span>Wird hochgeladen...</span>
-                <span>{uploadProgress}%</span>
-              </div>
-              <Progress value={uploadProgress} />
-            </div>
-          )}
-
           {/* Upload Button */}
           <Button
             onClick={handleUpload}
-            disabled={!selectedFile || !category || isUploading}
+            disabled={selectedFiles.length === 0 || !category}
             className="w-full"
           >
             <Upload className="w-4 h-4 mr-2" />
-            {isUploading ? 'Wird hochgeladen...' : 'Dokument hochladen'}
+            {selectedFiles.length > 0
+              ? `${selectedFiles.length} Dokument(e) zur Warteschlange hinzufügen`
+              : 'Dokumente hochladen'}
           </Button>
 
           <p className="text-xs text-muted-foreground">
@@ -487,6 +538,76 @@ export function DocumentUploadTab() {
           </p>
         </CardContent>
       </Card>
+
+      {/* Upload Queue - Only shows pending items waiting to be processed */}
+      {serverQueue.queue.length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>Upload-Warteschlange</CardTitle>
+                <CardDescription>
+                  {serverQueue.stats.pending} Dokument(e) warten auf Verarbeitung
+                  {serverQueue.stats.processing > 0 && ` • ${serverQueue.stats.processing} wird gerade verarbeitet`}
+                </CardDescription>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (confirm('Möchten Sie alle Elemente aus der Warteschlange entfernen? Dies kann nicht rückgängig gemacht werden.')) {
+                    serverQueue.clearQueue();
+                  }
+                }}
+                disabled={serverQueue.isClearing}
+              >
+                Alle löschen
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {serverQueue.queue.map((item) => (
+                <div
+                  key={item.queue_id}
+                  className="flex items-center gap-3 p-3 border rounded-lg bg-card"
+                >
+                  <div className="flex-shrink-0">
+                    {getStatusIcon(item.status)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-sm font-medium truncate">{item.filename}</span>
+                      <span className="text-xs px-2 py-0.5 bg-secondary text-secondary-foreground rounded">
+                        {translateCategory(item.category)}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        Position: {item.position}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{getStatusText(item.status)}</span>
+                      <span>•</span>
+                      <span>{(item.file_size_bytes / 1024 / 1024).toFixed(2)} MB</span>
+                      <span>•</span>
+                      <span>von {item.uploader_name}</span>
+                    </div>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => serverQueue.removeFromQueue(item.queue_id)}
+                    disabled={serverQueue.isRemoving}
+                    title="Aus Warteschlange entfernen und Dokument löschen"
+                  >
+                    <X className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Documents List */}
       <Card>
