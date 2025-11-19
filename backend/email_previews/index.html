@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Email Template Previews - Baumaschinen-KI</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 0;
+            margin: 0;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+
+        .page-wrapper {
+            padding: 60px 20px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 50px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        }
+
+        .header-section {
+            text-align: center;
+            margin-bottom: 50px;
+            padding-bottom: 40px;
+            border-bottom: 3px solid #e2e8f0;
+        }
+
+        .logo-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 24px;
+            box-shadow: 0 8px 24px rgba(37, 99, 235, 0.3);
+        }
+
+        .logo-icon span {
+            font-size: 40px;
+        }
+
+        h1 {
+            color: #1e293b;
+            font-size: 36px;
+            font-weight: 800;
+            margin-bottom: 12px;
+            letter-spacing: -0.5px;
+        }
+
+        .subtitle {
+            color: #64748b;
+            font-size: 20px;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .company {
+            color: #2563eb;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .intro-text {
+            background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+            border-left: 4px solid #2563eb;
+            padding: 20px 24px;
+            margin-bottom: 40px;
+            border-radius: 8px;
+        }
+
+        .intro-text p {
+            color: #1e40af;
+            font-size: 15px;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        .template-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .template-item {
+            margin-bottom: 20px;
+        }
+
+        .template-link {
+            display: block;
+            padding: 24px 28px;
+            background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%);
+            border: 2px solid #e2e8f0;
+            color: #1e293b;
+            text-decoration: none;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 18px;
+            transition: all 0.3s ease;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .template-link::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 6px;
+            height: 100%;
+            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+            transition: width 0.3s ease;
+        }
+
+        .template-link:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+            border-color: #2563eb;
+        }
+
+        .template-link:hover::before {
+            width: 100%;
+            opacity: 0.05;
+        }
+
+        .template-number {
+            display: inline-block;
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+            color: white;
+            border-radius: 8px;
+            text-align: center;
+            line-height: 36px;
+            font-size: 16px;
+            font-weight: 700;
+            margin-right: 16px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .template-content {
+            display: inline-block;
+            vertical-align: middle;
+            position: relative;
+            z-index: 1;
+        }
+
+        .template-title {
+            display: block;
+            font-size: 18px;
+            font-weight: 700;
+            color: #1e293b;
+            margin-bottom: 4px;
+        }
+
+        .template-description {
+            display: block;
+            color: #64748b;
+            font-size: 14px;
+            font-weight: 400;
+            margin-top: 6px;
+        }
+
+        .template-badge {
+            position: absolute;
+            top: 50%;
+            right: 24px;
+            transform: translateY(-50%);
+            background-color: #eff6ff;
+            color: #2563eb;
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            z-index: 1;
+        }
+
+        .footer {
+            margin-top: 50px;
+            padding-top: 30px;
+            border-top: 2px solid #e2e8f0;
+            text-align: center;
+        }
+
+        .footer-content {
+            color: #64748b;
+            font-size: 14px;
+            line-height: 1.8;
+            margin-bottom: 16px;
+        }
+
+        .footer-brand {
+            color: #1e293b;
+            font-size: 16px;
+            font-weight: 700;
+            margin-top: 20px;
+        }
+
+        .footer-copyright {
+            color: #94a3b8;
+            font-size: 13px;
+            margin-top: 8px;
+        }
+
+        @media only screen and (max-width: 768px) {
+            .page-wrapper {
+                padding: 30px 15px;
+            }
+
+            .container {
+                padding: 30px 25px;
+                border-radius: 12px;
+            }
+
+            h1 {
+                font-size: 28px;
+            }
+
+            .subtitle {
+                font-size: 18px;
+            }
+
+            .template-link {
+                padding: 20px;
+                font-size: 16px;
+            }
+
+            .template-number {
+                width: 32px;
+                height: 32px;
+                line-height: 32px;
+                font-size: 14px;
+                margin-right: 12px;
+            }
+
+            .template-title {
+                font-size: 16px;
+            }
+
+            .template-description {
+                font-size: 13px;
+            }
+
+            .template-badge {
+                position: static;
+                transform: none;
+                display: block;
+                width: fit-content;
+                margin-top: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="page-wrapper">
+        <div class="container">
+            <div class="header-section">
+                <div class="logo-icon">
+                    <span>📧</span>
+                </div>
+                <h1>Email Template Previews</h1>
+                <div class="subtitle">Baumaschinen-KI</div>
+                <div class="company">Rüko GmbH</div>
+            </div>
+
+            <div class="intro-text">
+                <p><strong>📋 Hinweis:</strong> Dies sind Vorschau-Dateien für die E-Mail-Templates des Systems. Die tatsächlichen E-Mails werden dynamisch mit echten Benutzerdaten generiert.</p>
+            </div>
+
+            <ul class="template-list">
+                <li class="template-item">
+                    <a href="01_verification_email.html" class="template-link" target="_blank">
+                        <span class="template-number">1</span>
+                        <span class="template-content">
+                            <span class="template-title">E-Mail-Verifizierung</span>
+                            <span class="template-description">Bestätigungs-E-Mail nach Registrierung</span>
+                        </span>
+                        <span class="template-badge">VORSCHAU</span>
+                    </a>
+                </li>
+
+                <li class="template-item">
+                    <a href="02_admin_notification.html" class="template-link" target="_blank">
+                        <span class="template-number">2</span>
+                        <span class="template-content">
+                            <span class="template-title">Administrator-Benachrichtigung</span>
+                            <span class="template-description">Benachrichtigung über neue Benutzerregistrierung</span>
+                        </span>
+                        <span class="template-badge">VORSCHAU</span>
+                    </a>
+                </li>
+
+                <li class="template-item">
+                    <a href="03_approval_email.html" class="template-link" target="_blank">
+                        <span class="template-number">3</span>
+                        <span class="template-content">
+                            <span class="template-title">Konto genehmigt</span>
+                            <span class="template-description">Bestätigung der Kontogenehmigung</span>
+                        </span>
+                        <span class="template-badge">VORSCHAU</span>
+                    </a>
+                </li>
+
+                <li class="template-item">
+                    <a href="04_password_reset.html" class="template-link" target="_blank">
+                        <span class="template-number">4</span>
+                        <span class="template-content">
+                            <span class="template-title">Passwort zurücksetzen</span>
+                            <span class="template-description">Passwort-Zurücksetzungslink</span>
+                        </span>
+                        <span class="template-badge">VORSCHAU</span>
+                    </a>
+                </li>
+
+                <li class="template-item">
+                    <a href="05a_rejection_email_with_reason.html" class="template-link" target="_blank">
+                        <span class="template-number">5a</span>
+                        <span class="template-content">
+                            <span class="template-title">Registrierung abgelehnt (mit Grund)</span>
+                            <span class="template-description">Ablehnung mit Begründung</span>
+                        </span>
+                        <span class="template-badge">VORSCHAU</span>
+                    </a>
+                </li>
+
+                <li class="template-item">
+                    <a href="05b_rejection_email_without_reason.html" class="template-link" target="_blank">
+                        <span class="template-number">5b</span>
+                        <span class="template-content">
+                            <span class="template-title">Registrierung abgelehnt (ohne Grund)</span>
+                            <span class="template-description">Ablehnung ohne Begründung</span>
+                        </span>
+                        <span class="template-badge">VORSCHAU</span>
+                    </a>
+                </li>
+            </ul>
+
+            <div class="footer">
+                <div class="footer-content">
+                    Alle Templates sind optimiert für moderne E-Mail-Clients<br>
+                    und gewährleisten maximale Kompatibilität und Responsivität.
+                </div>
+                <div class="footer-brand">Baumaschinen-KI</div>
+                <div class="footer-copyright">© 2025 Rüko GmbH - Alle Rechte vorbehalten</div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

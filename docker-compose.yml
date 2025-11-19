@@ -1,0 +1,347 @@
+# =============================================================================
+# Docker Compose for Baumaschinen-KI Application
+# =============================================================================
+# Purpose: Local testing and production deployment orchestration
+# Services: Backend (FastAPI), Frontend (React + Nginx), Weaviate (Vector DB)
+# Monitoring: Prometheus, Grafana
+# External: MongoDB Atlas
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ===========================================================================
+  # Backend Service - FastAPI Python Application
+  # ===========================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: registry.digitalocean.com/ruekogpt1/baumaschinen-backend:latest
+    container_name: baumaschinen-backend
+    restart: unless-stopped
+
+    ports:
+      - "8000:8000"
+
+    environment:
+      # Application settings
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      SECRET_KEY: ${SECRET_KEY}
+      API_INTERNAL_KEY: ${API_INTERNAL_KEY}
+
+      # Server configuration
+      HOST: 0.0.0.0
+      PORT: 8000
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+
+      # MongoDB Atlas (external)
+      MONGODB_URI: ${MONGODB_URI}
+      MONGODB_DATABASE: ${MONGODB_DATABASE:-building_machinery_chatbot}
+
+      # Pinecone (external) - DEPRECATED: Migrating to Weaviate
+      PINECONE_API_KEY: ${PINECONE_API_KEY:-}
+      PINECONE_ENVIRONMENT: ${PINECONE_ENVIRONMENT:-us-east-1}
+      PINECONE_INDEX_NAME: ${PINECONE_INDEX_NAME:-building-machinery-docs}
+
+      # Weaviate (local vector database)
+      WEAVIATE_HOST: weaviate
+      WEAVIATE_PORT: 8080
+      WEAVIATE_GRPC_PORT: 50051
+      WEAVIATE_SCHEME: http
+      ENABLE_WEAVIATE_MULTITENANCY: ${ENABLE_WEAVIATE_MULTITENANCY:-true}
+      ENABLE_WEAVIATE_COMPRESSION: ${ENABLE_WEAVIATE_COMPRESSION:-true}
+      DEFAULT_HYBRID_ALPHA: ${DEFAULT_HYBRID_ALPHA:-0.75}
+
+      # Cohere (for reranking)
+      COHERE_API_KEY: ${COHERE_API_KEY:-}
+
+      # OpenAI
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_CHAT_MODEL: ${OPENAI_CHAT_MODEL:-gpt-4o-mini}
+      OPENAI_EMBEDDING_MODEL: ${OPENAI_EMBEDDING_MODEL:-text-embedding-3-large}
+
+      # Aryn/Sycamore (Automated Document Processing)
+      ARYN_API_KEY: ${ARYN_API_KEY}
+      USE_SYCAMORE_PROCESSOR: ${USE_SYCAMORE_PROCESSOR:-true}
+      SYCAMORE_EXTRACT_TABLES: ${SYCAMORE_EXTRACT_TABLES:-true}
+      SYCAMORE_USE_OCR: ${SYCAMORE_USE_OCR:-true}
+      SYCAMORE_EXTRACT_IMAGES: ${SYCAMORE_EXTRACT_IMAGES:-true}
+      SYCAMORE_OUTPUT_FORMAT: ${SYCAMORE_OUTPUT_FORMAT:-json}
+
+      # Email (SMTP)
+      SMTP_HOST: ${SMTP_HOST:-smtp.office365.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      SMTP_FROM_EMAIL: ${SMTP_FROM_EMAIL}
+
+      # Frontend URL
+      FRONTEND_URL: ${FRONTEND_URL}
+
+      # Optional: Sentry
+      SENTRY_DSN: ${SENTRY_DSN:-}
+
+    volumes:
+      # Logs persistence
+      - backend-logs:/app/logs
+
+    # Resource limits - Give backend 6GB for OCR processing (EasyOCR + PyTorch)
+    deploy:
+      resources:
+        limits:
+          memory: 6G
+        reservations:
+          memory: 2G
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+    networks:
+      - baumaschinen-network
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # Weaviate Service - Vector Database with Advanced Features
+  # ===========================================================================
+  weaviate:
+    image: cr.weaviate.io/semitechnologies/weaviate:1.27.5
+    container_name: baumaschinen-weaviate
+    restart: unless-stopped
+
+    ports:
+      - "8080:8080"    # HTTP endpoint
+      - "50051:50051"  # gRPC endpoint
+
+    environment:
+      # Query defaults
+      QUERY_DEFAULTS_LIMIT: 25
+      QUERY_MAXIMUM_RESULTS: 10000
+
+      # Authentication (disabled for local development, enable for production)
+      AUTHENTICATION_ANONYMOUS_ACCESS_ENABLED: 'true'
+      # AUTHENTICATION_APIKEY_ENABLED: 'true'
+      # AUTHENTICATION_APIKEY_ALLOWED_KEYS: ${WEAVIATE_API_KEY}
+      # AUTHENTICATION_APIKEY_USERS: admin
+
+      # Persistence
+      PERSISTENCE_DATA_PATH: /var/lib/weaviate
+
+      # Performance & Resources
+      ENABLE_MODULES: >
+        text2vec-openai,
+        generative-openai,
+        qna-openai,
+        reranker-cohere
+
+      # text2vec-openai module configuration
+      OPENAI_APIKEY: ${OPENAI_API_KEY}
+
+      # Cohere reranker module configuration
+      COHERE_APIKEY: ${COHERE_API_KEY:-}
+
+      # Default vectorizer
+      DEFAULT_VECTORIZER_MODULE: text2vec-openai
+
+      # Cluster configuration (single-node standalone mode)
+      CLUSTER_HOSTNAME: 'node1'
+      CLUSTER_GOSSIP_BIND_PORT: '7946'
+      CLUSTER_DATA_BIND_PORT: '7947'
+      # Disable clustering for standalone mode
+      RAFT_JOIN: ''
+
+      # Monitoring
+      PROMETHEUS_MONITORING_ENABLED: 'true'
+      PROMETHEUS_MONITORING_GROUP: 'weaviate'
+
+      # CORS Configuration (allow browser access)
+      CORS_ALLOW_ORIGIN: '*'
+      CORS_ALLOW_METHODS: 'GET,POST,PUT,DELETE,OPTIONS'
+      CORS_ALLOW_HEADERS: 'Content-Type,Authorization,X-Weaviate-Tenant'
+
+      # Logging
+      LOG_LEVEL: info
+      LOG_FORMAT: json
+
+      # Performance tuning
+      GOMEMLIMIT: 4GiB
+      GOMAXPROCS: 4
+
+      # Async indexing for better write performance
+      ASYNC_INDEXING: 'true'
+
+      # Enable compression (PQ)
+      ENABLE_COMPRESSION: 'true'
+
+    volumes:
+      - weaviate-data:/var/lib/weaviate
+
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 1G
+
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/v1/.well-known/ready"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+    networks:
+      - baumaschinen-network
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ===========================================================================
+  # Prometheus - Metrics Collection
+  # ===========================================================================
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: baumaschinen-prometheus
+    restart: unless-stopped
+
+    ports:
+      - "9090:9090"
+
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+
+    depends_on:
+      - weaviate
+
+    networks:
+      - baumaschinen-network
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ===========================================================================
+  # Grafana - Metrics Visualization
+  # ===========================================================================
+  grafana:
+    image: grafana/grafana:latest
+    container_name: baumaschinen-grafana
+    restart: unless-stopped
+
+    ports:
+      - "3001:3000"
+
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_ADMIN_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s:%(http_port)s/grafana/
+      - GF_INSTALL_PLUGINS=redis-datasource
+
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+    depends_on:
+      - prometheus
+
+    networks:
+      - baumaschinen-network
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+
+  # ===========================================================================
+  # Frontend Service - React + Vite + Nginx
+  # ===========================================================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+        VITE_APP_NAME: Baumaschinen-KI
+        VITE_ENVIRONMENT: ${ENVIRONMENT:-production}
+        BUILD_VERSION: ${BUILD_VERSION:-latest}
+        BUILD_DATE: ${BUILD_DATE}
+    image: registry.digitalocean.com/ruekogpt1/baumaschinen-frontend:latest
+    container_name: baumaschinen-frontend
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+
+    depends_on:
+      backend:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+    networks:
+      - baumaschinen-network
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+# =============================================================================
+# Networks
+# =============================================================================
+networks:
+  baumaschinen-network:
+    driver: bridge
+    name: baumaschinen-network
+
+# =============================================================================
+# Volumes
+# =============================================================================
+volumes:
+  backend-logs:
+    driver: local
+    name: baumaschinen-backend-logs
+
+  weaviate-data:
+    driver: local
+    name: baumaschinen-weaviate-data
+
+  prometheus-data:
+    driver: local
+    name: baumaschinen-prometheus-data
+
+  grafana-data:
+    driver: local
+    name: baumaschinen-grafana-data

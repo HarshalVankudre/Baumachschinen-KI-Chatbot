@@ -1,0 +1,245 @@
+/**
+ * Premium Component Styles
+ * Building Machinery AI Chatbot - Additional CSS utilities
+ *
+ * This file contains additional utility classes for the new premium features.
+ * Import this in your main CSS file or include directly in components.
+ */
+
+/* ============================================
+   MESSAGE FEEDBACK COMPONENT
+   ============================================ */
+
+.feedback-button-positive {
+  @apply h-8 w-8 rounded-lg transition-all duration-200;
+  @apply hover:bg-success/10 hover:text-success hover:scale-105;
+}
+
+.feedback-button-positive.active {
+  @apply bg-success/15 text-success scale-105 shadow-premium-sm;
+}
+
+.feedback-button-negative {
+  @apply h-8 w-8 rounded-lg transition-all duration-200;
+  @apply hover:bg-destructive/10 hover:text-destructive hover:scale-105;
+}
+
+.feedback-button-negative.active {
+  @apply bg-destructive/15 text-destructive scale-105 shadow-premium-sm;
+}
+
+.feedback-comment-field {
+  @apply w-full min-h-[80px] px-3 py-2.5 text-sm rounded-lg;
+  @apply bg-background border-2 border-border/50;
+  @apply focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20;
+  @apply transition-all duration-200 resize-none scrollbar-thin;
+  @apply placeholder:text-muted-foreground/60;
+}
+
+.feedback-success-badge {
+  @apply flex items-center gap-2 text-sm text-success;
+  @apply px-3 py-1.5 rounded-lg bg-success/10 border border-success/20;
+  @apply animate-fade-in;
+}
+
+/* ============================================
+   RATE LIMIT WARNING
+   ============================================ */
+
+.rate-limit-container-warning {
+  @apply relative overflow-hidden rounded-xl border shadow-premium-lg;
+  @apply bg-warning/5 border-warning/30 animate-fade-in;
+}
+
+.rate-limit-container-critical {
+  @apply relative overflow-hidden rounded-xl border shadow-premium-lg;
+  @apply bg-destructive/5 border-destructive/30 animate-fade-in;
+}
+
+.rate-limit-bg-gradient-warning {
+  @apply absolute inset-0 opacity-30;
+}
+
+.rate-limit-bg-gradient-warning::before {
+  content: '';
+  @apply absolute inset-0 animate-pulse-subtle;
+  background: linear-gradient(
+    90deg,
+    hsl(var(--warning) / 0.1) 0%,
+    transparent 100%
+  );
+}
+
+.rate-limit-bg-gradient-critical {
+  @apply absolute inset-0 opacity-30;
+}
+
+.rate-limit-bg-gradient-critical::before {
+  content: '';
+  @apply absolute inset-0 animate-pulse-subtle;
+  background: linear-gradient(
+    90deg,
+    hsl(var(--destructive) / 0.1) 0%,
+    transparent 100%
+  );
+}
+
+.rate-limit-icon-badge-warning {
+  @apply flex-shrink-0 p-2.5 rounded-lg shadow-premium-sm;
+  @apply bg-warning/20 text-warning;
+}
+
+.rate-limit-icon-badge-critical {
+  @apply flex-shrink-0 p-2.5 rounded-lg shadow-premium-sm;
+  @apply bg-destructive/20 text-destructive;
+}
+
+.rate-limit-usage-bar {
+  @apply relative h-3 bg-background/50 rounded-full overflow-hidden;
+  @apply border border-border/50;
+}
+
+.rate-limit-usage-fill-warning {
+  @apply absolute inset-y-0 left-0 rounded-full;
+  @apply transition-all duration-700 ease-out;
+  background: linear-gradient(
+    90deg,
+    hsl(var(--warning)) 0%,
+    hsl(var(--warning) / 0.8) 100%
+  );
+}
+
+.rate-limit-usage-fill-critical {
+  @apply absolute inset-y-0 left-0 rounded-full;
+  @apply transition-all duration-700 ease-out;
+  background: linear-gradient(
+    90deg,
+    hsl(var(--destructive)) 0%,
+    hsl(var(--destructive) / 0.8) 100%
+  );
+}
+
+.rate-limit-countdown {
+  @apply font-mono font-semibold text-foreground;
+}
+
+.rate-limit-upgrade-button {
+  @apply bg-gradient-to-r from-accent to-accent/90;
+  @apply hover:shadow-premium-lg hover:-translate-y-0.5;
+  @apply transition-all duration-200;
+}
+
+/* ============================================
+   RESPONSIVE UTILITIES
+   ============================================ */
+
+/* Add responsive utilities here if needed */
+
+/* ============================================
+   PRINT STYLES
+   ============================================ */
+
+@media print {
+  .hover-lift {
+    transform: none !important;
+    box-shadow: none !important;
+  }
+
+  /* Hide interactive elements */
+  .feedback-button-positive,
+  .feedback-button-negative,
+  .rate-limit-upgrade-button {
+    display: none !important;
+  }
+}
+
+/* ============================================
+   DARK MODE ADJUSTMENTS
+   ============================================ */
+
+/* Add dark mode adjustments here if needed */
+
+/* ============================================
+   ACCESSIBILITY ENHANCEMENTS
+   ============================================ */
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .rate-limit-icon-badge-warning,
+  .rate-limit-icon-badge-critical {
+    border-width: 2px;
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .rate-limit-usage-fill-warning,
+  .rate-limit-usage-fill-critical {
+    transition: none !important;
+  }
+
+  .hover-lift:hover {
+    transform: none !important;
+  }
+}
+
+/* Focus visible styles */
+.feedback-button-positive:focus-visible,
+.feedback-button-negative:focus-visible,
+.rate-limit-upgrade-button:focus-visible {
+  @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+}
+
+/* ============================================
+   ADVANCED ANIMATIONS
+   ============================================ */
+
+/* Success checkmark animation */
+@keyframes checkmark-draw {
+  from {
+    stroke-dashoffset: 100;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.checkmark-animated {
+  stroke-dasharray: 100;
+  animation: checkmark-draw 0.5s ease-out forwards;
+}
+
+/* Gradient shift animation for upgrade button */
+@keyframes gradient-shift {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+.rate-limit-upgrade-button:hover::before {
+  content: '';
+  @apply absolute inset-0 rounded-lg;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.1) 50%,
+    transparent 100%
+  );
+  background-size: 200% 200%;
+  animation: gradient-shift 2s ease infinite;
+}
+
+/* ============================================
+   END OF PREMIUM COMPONENT STYLES
+   ============================================ */

@@ -1,0 +1,488 @@
+name: Backend CI/CD Pipeline
+
+# Trigger on push to main branch and pull requests
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+# Environment variables
+env:
+  PYTHON_VERSION: '3.11'
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}/backend
+
+jobs:
+  # ============================================================================
+  # JOB 1: Code Quality & Linting
+  # ============================================================================
+  lint:
+    name: Code Quality & Linting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install black flake8 mypy
+          pip install -r requirements.txt
+
+      - name: Run Black (code formatting)
+        run: |
+          cd backend
+          black --check app/ tests/
+
+      - name: Run Flake8 (linting)
+        run: |
+          cd backend
+          flake8 app/ tests/ --max-line-length=100 --extend-ignore=E203,W503
+
+      - name: Run MyPy (type checking)
+        run: |
+          cd backend
+          mypy app/ --ignore-missing-imports
+        continue-on-error: true  # Don't fail build on type errors yet
+
+  # ============================================================================
+  # JOB 2: Unit Tests
+  # ============================================================================
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: lint
+
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+          pip install pytest-xdist  # For parallel test execution
+
+      - name: Run unit tests with coverage
+        env:
+          MONGODB_URI: mongodb://localhost:27017
+          DATABASE_NAME: test_building_machinery_chatbot
+          PINECONE_API_KEY: test-key
+          PINECONE_INDEX_NAME: test-index
+          OPENAI_API_KEY: test-key
+          POSTGRESQL_API_URL: http://test.com
+          POSTGRESQL_API_KEY_BASIC: test-key
+          POSTGRESQL_API_KEY_ELEVATED: test-key
+          POSTGRESQL_API_KEY_ADMIN: test-key
+          SMTP_HOST: smtp.test.com
+          SMTP_PORT: "587"
+          SMTP_USERNAME: test@test.com
+          SMTP_PASSWORD: test-pass
+          SECRET_KEY: test-secret-key-for-ci-pipeline-32-chars
+          ENVIRONMENT: test
+        run: |
+          cd backend
+          pytest tests/unit/ \
+            --cov=app \
+            --cov-report=xml \
+            --cov-report=term \
+            --cov-report=html \
+            -v \
+            -m unit
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./backend/coverage.xml
+          flags: unittests
+          name: backend-unit-tests
+          fail_ci_if_error: false
+
+      - name: Upload coverage HTML report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: backend/htmlcov/
+
+  # ============================================================================
+  # JOB 3: Integration Tests
+  # ============================================================================
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: lint
+
+    services:
+      mongodb:
+        image: mongo:7.0
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --eval 'db.runCommand({ ping: 1 })'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run integration tests
+        env:
+          MONGODB_URI: mongodb://localhost:27017
+          DATABASE_NAME: test_building_machinery_chatbot
+          PINECONE_API_KEY: test-key
+          PINECONE_INDEX_NAME: test-index
+          OPENAI_API_KEY: test-key
+          POSTGRESQL_API_URL: http://test.com
+          POSTGRESQL_API_KEY_BASIC: test-key
+          POSTGRESQL_API_KEY_ELEVATED: test-key
+          POSTGRESQL_API_KEY_ADMIN: test-key
+          SMTP_HOST: smtp.test.com
+          SMTP_PORT: "587"
+          SMTP_USERNAME: test@test.com
+          SMTP_PASSWORD: test-pass
+          SECRET_KEY: test-secret-key-for-ci-pipeline-32-chars
+          ENVIRONMENT: test
+        run: |
+          cd backend
+          pytest tests/integration/ \
+            --cov=app \
+            --cov-report=xml \
+            --cov-report=term \
+            -v \
+            -m integration
+
+      - name: Upload integration coverage
+        uses: codecov/codecov-action@v4
+        with:
+          file: ./backend/coverage.xml
+          flags: integrationtests
+          name: backend-integration-tests
+          fail_ci_if_error: false
+
+  # ============================================================================
+  # JOB 4: Security Scan
+  # ============================================================================
+  security:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    needs: lint
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python ${{ env.PYTHON_VERSION }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install safety bandit
+
+      - name: Run Safety (dependency vulnerability check)
+        run: |
+          cd backend
+          safety check --json
+        continue-on-error: true
+
+      - name: Run Bandit (security linting)
+        run: |
+          cd backend
+          bandit -r app/ -f json -o bandit-report.json
+        continue-on-error: true
+
+      - name: Upload security reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: security-reports
+          path: backend/bandit-report.json
+        if: always()
+
+  # ============================================================================
+  # JOB 5: Build Docker Image
+  # ============================================================================
+  build:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: [unit-tests, integration-tests]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop')
+
+    permissions:
+      contents: read
+      packages: write
+
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:buildcache,mode=max
+
+  # ============================================================================
+  # JOB 6: Deploy to Staging
+  # ============================================================================
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/develop'
+    environment:
+      name: staging
+      url: https://staging-api.yourdomain.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to staging server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_USERNAME }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          script: |
+            # Pull latest image
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop
+
+            # Stop old container gracefully (30 second timeout)
+            docker stop backend-staging --time 30 || true
+            docker rm backend-staging || true
+
+            # Start new container
+            docker run -d \
+              --name backend-staging \
+              --restart unless-stopped \
+              -p 8000:8000 \
+              -e MONGODB_URI="${{ secrets.STAGING_MONGODB_URI }}" \
+              -e DATABASE_NAME="${{ secrets.STAGING_DATABASE_NAME }}" \
+              -e PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}" \
+              -e PINECONE_INDEX_NAME="${{ secrets.STAGING_PINECONE_INDEX }}" \
+              -e OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+              -e POSTGRESQL_API_URL="${{ secrets.POSTGRESQL_API_URL }}" \
+              -e POSTGRESQL_API_KEY_BASIC="${{ secrets.POSTGRESQL_API_KEY_BASIC }}" \
+              -e POSTGRESQL_API_KEY_ELEVATED="${{ secrets.POSTGRESQL_API_KEY_ELEVATED }}" \
+              -e POSTGRESQL_API_KEY_ADMIN="${{ secrets.POSTGRESQL_API_KEY_ADMIN }}" \
+              -e SMTP_HOST="${{ secrets.SMTP_HOST }}" \
+              -e SMTP_PORT="${{ secrets.SMTP_PORT }}" \
+              -e SMTP_USERNAME="${{ secrets.SMTP_USERNAME }}" \
+              -e SMTP_PASSWORD="${{ secrets.SMTP_PASSWORD }}" \
+              -e SECRET_KEY="${{ secrets.STAGING_SECRET_KEY }}" \
+              -e ENVIRONMENT="staging" \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:develop
+
+            # Clean up old images
+            docker image prune -f
+
+      - name: Wait for deployment
+        run: sleep 10
+
+      - name: Health check
+        run: |
+          max_attempts=10
+          attempt=0
+
+          while [ $attempt -lt $max_attempts ]; do
+            if curl -f https://staging-api.yourdomain.com/api/health; then
+              echo "Health check passed!"
+              exit 0
+            fi
+
+            attempt=$((attempt + 1))
+            echo "Health check attempt $attempt failed, retrying..."
+            sleep 5
+          done
+
+          echo "Health check failed after $max_attempts attempts"
+          exit 1
+
+  # ============================================================================
+  # JOB 7: Deploy to Production
+  # ============================================================================
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: production
+      url: https://api.yourdomain.com
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to production server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.PRODUCTION_HOST }}
+          username: ${{ secrets.PRODUCTION_USERNAME }}
+          key: ${{ secrets.PRODUCTION_SSH_KEY }}
+          script: |
+            # Pull latest image
+            docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+            # Stop old container gracefully
+            docker stop backend-production --time 30 || true
+            docker rm backend-production || true
+
+            # Start new container
+            docker run -d \
+              --name backend-production \
+              --restart unless-stopped \
+              -p 8000:8000 \
+              -e MONGODB_URI="${{ secrets.PRODUCTION_MONGODB_URI }}" \
+              -e DATABASE_NAME="${{ secrets.PRODUCTION_DATABASE_NAME }}" \
+              -e PINECONE_API_KEY="${{ secrets.PINECONE_API_KEY }}" \
+              -e PINECONE_INDEX_NAME="${{ secrets.PRODUCTION_PINECONE_INDEX }}" \
+              -e OPENAI_API_KEY="${{ secrets.OPENAI_API_KEY }}" \
+              -e POSTGRESQL_API_URL="${{ secrets.POSTGRESQL_API_URL }}" \
+              -e POSTGRESQL_API_KEY_BASIC="${{ secrets.POSTGRESQL_API_KEY_BASIC }}" \
+              -e POSTGRESQL_API_KEY_ELEVATED="${{ secrets.POSTGRESQL_API_KEY_ELEVATED }}" \
+              -e POSTGRESQL_API_KEY_ADMIN="${{ secrets.POSTGRESQL_API_KEY_ADMIN }}" \
+              -e SMTP_HOST="${{ secrets.SMTP_HOST }}" \
+              -e SMTP_PORT="${{ secrets.SMTP_PORT }}" \
+              -e SMTP_USERNAME="${{ secrets.SMTP_USERNAME }}" \
+              -e SMTP_PASSWORD="${{ secrets.SMTP_PASSWORD }}" \
+              -e SECRET_KEY="${{ secrets.PRODUCTION_SECRET_KEY }}" \
+              -e SENTRY_DSN="${{ secrets.SENTRY_DSN }}" \
+              -e ENVIRONMENT="production" \
+              ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+
+            # Clean up old images (keep last 3)
+            docker image prune -f --filter "until=72h"
+
+      - name: Wait for deployment
+        run: sleep 10
+
+      - name: Health check
+        run: |
+          max_attempts=10
+          attempt=0
+
+          while [ $attempt -lt $max_attempts ]; do
+            if curl -f https://api.yourdomain.com/api/health; then
+              echo "Production health check passed!"
+              exit 0
+            fi
+
+            attempt=$((attempt + 1))
+            echo "Health check attempt $attempt failed, retrying..."
+            sleep 5
+          done
+
+          echo "Production health check failed!"
+
+          # Rollback on failure
+          echo "Rolling back to previous version..."
+          docker stop backend-production
+          docker run -d \
+            --name backend-production \
+            --restart unless-stopped \
+            -p 8000:8000 \
+            --env-file /opt/backend/.env.production \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:previous
+
+          exit 1
+
+      - name: Create Sentry release
+        uses: getsentry/action-release@v1
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ secrets.SENTRY_ORG }}
+          SENTRY_PROJECT: ${{ secrets.SENTRY_PROJECT }}
+        with:
+          environment: production
+          version: ${{ github.sha }}
+
+  # ============================================================================
+  # JOB 8: Notification
+  # ============================================================================
+  notify:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [deploy-staging, deploy-production]
+    if: always()
+
+    steps:
+      - name: Send Slack notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          text: |
+            Backend deployment ${{ job.status }}
+            Branch: ${{ github.ref }}
+            Commit: ${{ github.sha }}
+            Author: ${{ github.actor }}
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        if: always()

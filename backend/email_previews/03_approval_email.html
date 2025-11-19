@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Ihr Konto wurde genehmigt</title>
+    <!--[if mso]>
+    <style type="text/css">
+        body, table, td {font-family: Arial, Helvetica, sans-serif !important;}
+    </style>
+    <![endif]-->
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f7fa; font-family: 'Segoe UI', Arial, Helvetica, sans-serif; -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;">
+
+    <!-- Email Wrapper -->
+    <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="background-color: #f4f7fa;">
+        <tr>
+            <td style="padding: 40px 20px;">
+
+                <!-- Email Container -->
+                <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="600" style="margin: 0 auto; background-color: #ffffff; border-radius: 8px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08); overflow: hidden; max-width: 100%;">
+
+                    <!-- Header with Brand -->
+                    <tr>
+                        <td style="background: linear-gradient(135deg, #059669 0%, #10b981 50%, #34d399 100%); padding: 50px 40px; text-align: center;">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td style="text-align: center;">
+                                        <div style="width: 90px; height: 90px; background-color: rgba(255, 255, 255, 0.2); border-radius: 50%; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(10px); border: 3px solid rgba(255, 255, 255, 0.3);">
+                                            <span style="font-size: 52px; line-height: 1;">✓</span>
+                                        </div>
+                                        <h1 style="margin: 0 0 8px 0; color: #ffffff; font-size: 32px; font-weight: 700; letter-spacing: -0.5px;">Konto genehmigt!</h1>
+                                        <p style="margin: 0; color: rgba(255, 255, 255, 0.95); font-size: 16px; font-weight: 500;">Willkommen bei der Baumaschinen-KI</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Content -->
+                    <tr>
+                        <td style="padding: 50px 40px;">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td>
+                                        <!-- Success Badge -->
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 0 0 30px 0;">
+                                            <tr>
+                                                <td style="text-align: center;">
+                                                    <span style="display: inline-block; background-color: #d1fae5; color: #065f46; padding: 10px 20px; border-radius: 24px; font-size: 13px; font-weight: 700; letter-spacing: 0.5px;">
+                                                        ERFOLGREICH GENEHMIGT
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <h2 style="margin: 0 0 30px 0; color: #1e293b; font-size: 28px; font-weight: 700; line-height: 1.3;">Herzlich willkommen</h2>
+
+                                        <p style="margin: 0 0 20px 0; color: #1e293b; font-size: 18px; font-weight: 600; line-height: 1.6;">Hallo {{ username }},</p>
+
+                                        <p style="margin: 0 0 20px 0; color: #475569; font-size: 16px; line-height: 1.7;"><strong style="color: #059669;">Gute Nachrichten!</strong> Ihr Konto wurde von unserem Administrator genehmigt und ist nun vollständig aktiviert.</p>
+
+                                        <p style="margin: 0 0 30px 0; color: #475569; font-size: 16px; line-height: 1.7;">Sie können sich jetzt anmelden und alle Funktionen der Baumaschinen-KI von Rüko in vollem Umfang nutzen.</p>
+
+                                        <!-- Authorization Level Box -->
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 35px 0;">
+                                            <tr>
+                                                <td style="background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border: 2px solid #10b981; border-radius: 10px; padding: 30px; text-align: center; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.15);">
+                                                    <p style="margin: 0 0 12px 0; color: #065f46; font-size: 16px; font-weight: 600;">Ihre Autorisierungsebene:</p>
+                                                    <p style="margin: 0; color: #059669; font-size: 24px; font-weight: 700; letter-spacing: -0.5px;">{{ authorization_level }}</p>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <p style="margin: 35px 0 30px 0; color: #1e293b; font-size: 17px; line-height: 1.6; text-align: center; font-weight: 600;">Starten Sie jetzt mit der Baumaschinen-KI:</p>
+
+                                        <!-- CTA Button -->
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 35px 0;">
+                                            <tr>
+                                                <td style="text-align: center;">
+                                                    <!--[if mso]>
+                                                    <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="{{ login_link }}" style="height:54px;v-text-anchor:middle;width:280px;" arcsize="15%" stroke="f" fillcolor="#2563eb">
+                                                        <w:anchorlock/>
+                                                        <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:16px;font-weight:600;">Jetzt anmelden</center>
+                                                    </v:roundrect>
+                                                    <![endif]-->
+                                                    <!--[if !mso]><!-->
+                                                    <a href="{{ login_link }}" style="display: inline-block; padding: 18px 45px; background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%); color: #ffffff; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; box-shadow: 0 4px 14px rgba(37, 99, 235, 0.35); transition: all 0.3s ease;">
+                                                        Jetzt anmelden
+                                                    </a>
+                                                    <!--<![endif]-->
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                        <!-- Welcome Message -->
+                                        <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%" style="margin: 35px 0 0 0;">
+                                            <tr>
+                                                <td style="background-color: #eff6ff; border-left: 4px solid #2563eb; border-radius: 6px; padding: 20px 24px;">
+                                                    <p style="margin: 0; color: #1e40af; font-size: 15px; font-weight: 600; line-height: 1.6;">
+                                                        <span style="font-weight: 700;">🎉 Willkommen an Bord!</span> Wir freuen uns, Sie in unserem System begrüßen zu dürfen. Bei Fragen oder Unterstützungsbedarf stehen wir Ihnen gerne zur Verfügung.
+                                                    </p>
+                                                </td>
+                                            </tr>
+                                        </table>
+
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                    <!-- Footer -->
+                    <tr>
+                        <td style="background-color: #f8fafc; padding: 40px; border-top: 1px solid #e2e8f0;">
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" width="100%">
+                                <tr>
+                                    <td style="text-align: center;">
+                                        <p style="margin: 0 0 8px 0; color: #2563eb; font-size: 17px; font-weight: 700;">Baumaschinen-KI</p>
+                                        <p style="margin: 0 0 16px 0; color: #475569; font-size: 15px; font-weight: 500;">Rüko GmbH © 2025</p>
+
+                                        <div style="width: 40px; height: 1px; background-color: #cbd5e1; margin: 20px auto;"></div>
+
+                                        <p style="margin: 16px 0 0 0; color: #64748b; font-size: 13px; line-height: 1.6;">
+                                            Bei Fragen kontaktieren Sie bitte Ihren Administrator.
+                                        </p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+
+                </table>
+
+            </td>
+        </tr>
+    </table>
+
+</body>
+</html>

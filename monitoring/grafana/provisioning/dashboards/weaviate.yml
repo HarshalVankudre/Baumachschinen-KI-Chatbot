@@ -1,0 +1,19 @@
+# =============================================================================
+# Grafana Dashboard Provisioning
+# =============================================================================
+# Auto-load dashboards from /var/lib/grafana/dashboards
+# =============================================================================
+
+apiVersion: 1
+
+providers:
+  - name: 'Weaviate Dashboards'
+    orgId: 1
+    folder: 'Baumaschinen-KI'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true
